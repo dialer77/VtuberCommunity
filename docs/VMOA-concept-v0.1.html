@@ -1,0 +1,498 @@
+<style>
+  :root {
+    --bg: #F6F6FA;
+    --surface: #FFFFFF;
+    --surface-2: #EFEFF5;
+    --border: #E2E2EC;
+    --border-strong: #CFCFDE;
+    --ink: #191922;
+    --ink-2: #55556A;
+    --ink-3: #8B8BA2;
+    --accent: #DA1A63;
+    --accent-soft: #FBE4EE;
+    --accent-ink: #A81250;
+    --data: #0C7E93;
+    --data-soft: #DBF0F3;
+    --live: #D93129;
+    --rise: #C4780A;
+    --good: #158049;
+    --shadow: 0 1px 2px rgba(20,20,40,.05), 0 8px 24px rgba(20,20,40,.05);
+    --radius: 12px;
+    --font-body: -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, Roboto, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Code", "Consolas", "D2Coding", monospace;
+    --maxw: 860px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0D0D14;
+      --surface: #15151E;
+      --surface-2: #1D1D29;
+      --border: #292937;
+      --border-strong: #3A3A4C;
+      --ink: #ECECF4;
+      --ink-2: #A8A8BE;
+      --ink-3: #70708A;
+      --accent: #FF4C86;
+      --accent-soft: #2A1622;
+      --accent-ink: #FF7AA5;
+      --data: #37C4DA;
+      --data-soft: #10262B;
+      --live: #FF5C52;
+      --rise: #F0AB43;
+      --good: #3ECF80;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F6F6FA; --surface: #FFFFFF; --surface-2: #EFEFF5; --border: #E2E2EC;
+    --border-strong: #CFCFDE; --ink: #191922; --ink-2: #55556A; --ink-3: #8B8BA2;
+    --accent: #DA1A63; --accent-soft: #FBE4EE; --accent-ink: #A81250; --data: #0C7E93;
+    --data-soft: #DBF0F3; --live: #D93129; --rise: #C4780A; --good: #158049;
+    --shadow: 0 1px 2px rgba(20,20,40,.05), 0 8px 24px rgba(20,20,40,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0D0D14; --surface: #15151E; --surface-2: #1D1D29; --border: #292937;
+    --border-strong: #3A3A4C; --ink: #ECECF4; --ink-2: #A8A8BE; --ink-3: #70708A;
+    --accent: #FF4C86; --accent-soft: #2A1622; --accent-ink: #FF7AA5; --data: #37C4DA;
+    --data-soft: #10262B; --live: #FF5C52; --rise: #F0AB43; --good: #3ECF80;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-body); line-height: 1.65;
+    -webkit-font-smoothing: antialiased; font-size: 16px;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px 120px; }
+
+  /* ---- Header ---- */
+  header.masthead {
+    max-width: var(--maxw); margin: 0 auto; padding: 72px 24px 40px;
+  }
+  .kicker {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .kicker::before {
+    content: ""; width: 26px; height: 2px; background: var(--accent); display: inline-block;
+  }
+  h1.title {
+    font-size: clamp(38px, 7vw, 62px); line-height: 1.02; margin: 18px 0 8px;
+    font-weight: 800; letter-spacing: -.02em; text-wrap: balance;
+  }
+  h1.title .en { color: var(--ink-3); font-weight: 700; }
+  .tagline {
+    font-size: clamp(17px, 2.6vw, 21px); color: var(--ink-2); margin: 0 0 26px;
+    max-width: 40ch; text-wrap: balance;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center;
+    border-top: 1px solid var(--border); padding-top: 20px;
+  }
+  .meta {
+    font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2);
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .meta + .meta::before { content: "·"; color: var(--ink-3); margin-right: 10px; }
+
+  /* ---- Sections ---- */
+  section { margin-top: 56px; scroll-margin-top: 20px; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin-bottom: 10px;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .eyebrow .num { color: var(--accent); }
+  h2 {
+    font-size: clamp(24px, 4vw, 31px); font-weight: 750; letter-spacing: -.015em;
+    margin: 0 0 8px; text-wrap: balance;
+  }
+  h3 {
+    font-size: 18px; font-weight: 700; letter-spacing: -.01em; margin: 30px 0 8px;
+  }
+  p { margin: 0 0 14px; color: var(--ink); }
+  .lead { font-size: 17.5px; color: var(--ink-2); }
+  strong { font-weight: 680; }
+  a { color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+  a:hover { border-bottom-color: var(--accent); }
+  ul, ol { margin: 0 0 16px; padding-left: 20px; }
+  li { margin: 5px 0; }
+  li::marker { color: var(--ink-3); }
+
+  /* ---- Cards ---- */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 22px 24px; box-shadow: var(--shadow);
+  }
+  .grid { display: grid; gap: 14px; }
+  @media (min-width: 620px) { .grid.two { grid-template-columns: 1fr 1fr; } .grid.three { grid-template-columns: 1fr 1fr 1fr; } }
+
+  .concept-card { border-left: 3px solid var(--accent); }
+  .concept-card h3 { margin-top: 0; display: flex; align-items: center; gap: 8px; }
+  .concept-card p { margin-bottom: 0; color: var(--ink-2); font-size: 14.5px; }
+
+  /* ---- Callout ---- */
+  .callout {
+    background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: var(--radius); padding: 16px 20px; margin: 18px 0;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .label {
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase;
+    font-weight: 700; color: var(--accent-ink); display: block; margin-bottom: 6px;
+  }
+  .callout.data { background: var(--data-soft); border-color: color-mix(in srgb, var(--data) 30%, transparent); }
+  .callout.data .label { color: var(--data); }
+
+  /* ---- Pills ---- */
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 650;
+    padding: 2px 9px; border-radius: 999px; white-space: nowrap; line-height: 1.6;
+    font-family: var(--font-mono); letter-spacing: .01em;
+  }
+  .pill.ok { background: color-mix(in srgb, var(--good) 15%, transparent); color: var(--good); }
+  .pill.part { background: color-mix(in srgb, var(--rise) 16%, transparent); color: var(--rise); }
+  .pill.no { background: color-mix(in srgb, var(--ink-3) 16%, transparent); color: var(--ink-2); }
+  .pill.gray { background: color-mix(in srgb, var(--data) 15%, transparent); color: var(--data); }
+  .pill.p0 { background: var(--accent); color: #fff; }
+  .pill.p1 { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-ink); }
+  .pill.p2 { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--border); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .dot.live { background: var(--live); box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 22%, transparent); }
+
+  /* ---- Table ---- */
+  .scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 560px; background: var(--surface); }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th {
+    background: var(--surface-2); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--ink-2); font-weight: 700; position: sticky; top: 0;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { font-weight: 650; }
+  .num-col { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+
+  /* ---- Pipeline ---- */
+  .pipe { display: flex; gap: 0; align-items: stretch; overflow-x: auto; padding: 4px 2px 12px; }
+  .pipe-step {
+    flex: 1 0 150px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 15px; position: relative; box-shadow: var(--shadow);
+  }
+  .pipe-step + .pipe-step { margin-left: 26px; }
+  .pipe-step + .pipe-step::before {
+    content: "→"; position: absolute; left: -22px; top: 50%; transform: translateY(-50%);
+    color: var(--ink-3); font-size: 16px;
+  }
+  .pipe-step .n { font-family: var(--font-mono); font-size: 11px; color: var(--accent); font-weight: 700; }
+  .pipe-step h4 { margin: 4px 0 4px; font-size: 14.5px; font-weight: 700; }
+  .pipe-step p { margin: 0; font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+
+  /* ---- Roadmap ---- */
+  .roadmap { display: grid; gap: 0; }
+  .phase {
+    display: grid; grid-template-columns: 96px 1fr; gap: 18px; padding: 18px 0;
+    border-top: 1px solid var(--border);
+  }
+  .phase:first-child { border-top: none; }
+  .phase .when {
+    font-family: var(--font-mono); font-size: 13px; font-weight: 700; color: var(--accent);
+    padding-top: 2px;
+  }
+  .phase .when small { display: block; color: var(--ink-3); font-weight: 500; font-size: 11px; margin-top: 3px; }
+  .phase h3 { margin: 0 0 4px; font-size: 16px; }
+  .phase ul { margin: 6px 0 0; }
+  .phase li { font-size: 14px; color: var(--ink-2); }
+
+  /* ---- Open questions ---- */
+  .q { display: flex; gap: 12px; padding: 14px 0; border-top: 1px dashed var(--border); }
+  .q:first-child { border-top: none; }
+  .q .qid { font-family: var(--font-mono); color: var(--accent); font-weight: 700; font-size: 13px; flex: 0 0 auto; }
+  .q .qbody { font-size: 14.5px; }
+  .q .qbody b { display: block; margin-bottom: 2px; }
+  .q .qbody span { color: var(--ink-2); font-size: 13.5px; }
+
+  hr.rule { border: none; border-top: 1px solid var(--border); margin: 0; }
+  .foot { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--border); color: var(--ink-3); font-size: 13px; }
+  .foot a { color: var(--ink-2); }
+  .namealt { font-size: 13.5px; color: var(--ink-2); }
+  .namealt code { font-family: var(--font-mono); background: var(--surface-2); padding: 1px 6px; border-radius: 5px; color: var(--ink); font-size: 12.5px; }
+</style>
+
+<header class="masthead">
+  <div class="kicker">기획 · 개발 문서</div>
+  <h1 class="title">버모아 <span class="en">VMOA</span></h1>
+  <p class="tagline">흩어진 버튜버의 지금을, 한 화면에서.</p>
+  <div class="meta-row">
+    <span class="meta"><b>v0.1</b> 초안</span>
+    <span class="meta">작성일 <b>2026-07-06</b></span>
+    <span class="meta">상태 <b>기획 정리 중</b></span>
+    <span class="meta">수익 모델 <b>AdSense</b></span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <section id="overview">
+    <div class="eyebrow"><span class="num">01</span> 한눈에</div>
+    <h2>무엇을 만드는가</h2>
+    <p class="lead">치지직·SOOP·유튜브에 흩어져 방송하는 <strong>한국 버튜버의 실시간 방송 현황·신규 데뷔·급상승·이슈</strong>를 한 곳에 모아 매일 갱신하는 한국어 허브. 정적인 인물 DB가 아니라 <strong>"지금 무슨 일이 일어나는가"</strong>를 보여줘 반복 방문을 만드는 것이 목표.</p>
+    <div class="callout">
+      <span class="label">포지셔닝 한 줄</span>
+      <p>국내 인디·신인 버튜버에 특화된, <strong>실시간 방송현황 + 데뷔·급상승·이슈</strong>를 자동으로 갱신하는 한국어 실시간 허브. 글로벌·대형은 Holodex/Streams Charts에 양보하고, 그들이 놓친 <strong>치지직/SOOP 네이티브 + 이벤트성</strong>을 노린다.</p>
+    </div>
+    <p class="namealt">가칭 <strong>버모아(VMOA)</strong> — "버튜버를 모아보다". 대안: <code>라이브덱 LiveDeck</code> · <code>뷔넥스트 VNEXT</code> · <code>V-DEX</code>. 개발 코드네임은 <code>Project&nbsp;VDEX</code> 사용.</p>
+  </section>
+
+  <section id="why">
+    <div class="eyebrow"><span class="num">02</span> 배경</div>
+    <h2>왜 지금, 왜 이 자리인가</h2>
+    <p>유사 서비스는 이미 여럿 있지만 각자 빈틈이 있고, 그 빈틈이 곧 진입 지점이다.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>기존 서비스</th><th>강점</th><th>빈틈 (= 우리 기회)</th></tr></thead>
+        <tbody>
+          <tr><td><b>Holodex</b></td><td>글로벌 라이브·멀티뷰 표준</td><td>YouTube/Twitch만 — <b>치지직·SOOP 네이티브 미커버</b></td></tr>
+          <tr><td><b>Streams Charts</b></td><td>시청시간 기반 정밀 랭킹</td><td>유료·영어권 중심, 한국 인디 세분화 약함</td></tr>
+          <tr><td><b>소프트콘 뷰어십</b></td><td>한국 멀티플랫폼 뷰어십</td><td>순위 중심, 데뷔·이슈·큐레이션 약함</td></tr>
+          <tr><td><b>나의 작은 버튜버</b></td><td>중소 버튜버 인물 DB</td><td><b>무수익·정체</b>, 실시간성 없음, 알림 종료</td></tr>
+          <tr><td><b>브니버스</b></td><td>한국판 홀로덱스 시도</td><td>사실상 정체</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout data">
+      <span class="label">벤치마크 — 덥덥미(wwme.kr)</span>
+      <p>덥덥미는 <strong>자동 수집(실시간 폴링) + 크라우드소싱</strong>의 하이브리드다. 단, 크라우드소싱은 "실시간 값 입력"이 아니라 <strong>"무엇을 추적 대상에 넣을지"를 제보받고 관리자가 검수</strong>하는 데 한정된다. 우리는 이 구조를 그대로 채택 — <strong>지표는 100% 자동, 사람은 대상 등록·이슈 큐레이션만</strong> → 운영 부담을 최소화한다.</p>
+    </div>
+  </section>
+
+  <section id="concept">
+    <div class="eyebrow"><span class="num">03</span> 컨셉</div>
+    <h2>3가지 차별점</h2>
+    <p>순위·현황 자체는 레드오션. 차별화는 <strong>트래픽이 도는 이벤트성</strong>에 둔다. 이 3가지가 곧 AdSense 트래픽 엔진이다.</p>
+    <div class="grid three" style="margin-top:16px">
+      <div class="card concept-card">
+        <h3>신규 데뷔 캘린더</h3>
+        <p>오늘·이번 주 데뷔하는 버튜버를 자동 감지·정리. 기존 서비스가 가장 약한 영역.</p>
+      </div>
+      <div class="card concept-card">
+        <h3>실시간 급상승</h3>
+        <p>절대 시청자 수가 아니라 <b>변화율</b> 기반 "떡상 감지". 지금 뜨는 방송을 실시간으로.</p>
+      </div>
+      <div class="card concept-card">
+        <h3>이슈 타임라인</h3>
+        <p>커뮤니티에 흩어진 사건·이슈를 한 곳에 아카이빙. 자체 텍스트 → AdSense 승인에도 유리.</p>
+      </div>
+    </div>
+    <h3>타깃 사용자</h3>
+    <ul>
+      <li><strong>코어 팬</strong> — "내 최애가 지금 방송 중인지, 뭘 하는지" 하루에도 여러 번 확인</li>
+      <li><strong>신인 발굴형 시청자</strong> — 데뷔·급상승으로 새 버튜버를 찾는 사람</li>
+      <li><strong>이슈 팔로워</strong> — 씬에서 무슨 일이 있었는지 따라잡고 싶은 사람 (검색 유입 강함)</li>
+    </ul>
+  </section>
+
+  <section id="features">
+    <div class="eyebrow"><span class="num">04</span> 기능</div>
+    <h2>기능 목록 &amp; 우선순위</h2>
+    <p><span class="pill p0">P0</span> MVP 필수 &nbsp; <span class="pill p1">P1</span> 2차 &nbsp; <span class="pill p2">P2</span> 확장</p>
+    <div class="scroll" style="margin-top:14px">
+      <table>
+        <thead><tr><th>기능</th><th>설명</th><th>데이터 근거</th><th style="text-align:center">우선</th></tr></thead>
+        <tbody>
+          <tr><td><b>실시간 방송 현황</b></td><td>지금 방송 중인 버튜버 목록 (치지직 우선)</td><td>치지직 공식 API</td><td style="text-align:center"><span class="pill p0">P0</span></td></tr>
+          <tr><td><b>신규 데뷔 감지</b></td><td>처음 등장한 채널 자동 발견 + 데뷔 캘린더</td><td>라이브목록 폴링</td><td style="text-align:center"><span class="pill p0">P0</span></td></tr>
+          <tr><td><b>이슈 타임라인</b></td><td>씬 사건 아카이브 (수동 큐레이션)</td><td>자체 작성</td><td style="text-align:center"><span class="pill p0">P0</span></td></tr>
+          <tr><td><b>동접·시청시간 랭킹</b></td><td>자체 축적 시계열 기반 순위/차트</td><td>폴링 자체 DB</td><td style="text-align:center"><span class="pill p1">P1</span></td></tr>
+          <tr><td><b>SOOP 통합</b></td><td>SOOP 버추얼 방송까지 현황에 포함</td><td>SOOP 비공식 API</td><td style="text-align:center"><span class="pill p1">P1</span></td></tr>
+          <tr><td><b>실시간 급상승</b></td><td>규모보정 변화율로 떡상 방송 감지</td><td>시계열 + 이상치탐지</td><td style="text-align:center"><span class="pill p1">P1</span></td></tr>
+          <tr><td><b>버튜버 프로필</b></td><td>인물별 채널·기록·플랫폼 통합 페이지</td><td>다중 소스</td><td style="text-align:center"><span class="pill p2">P2</span></td></tr>
+          <tr><td><b>멀티뷰</b></td><td>여러 방송 한 화면 동시 시청</td><td>플랫폼 임베드</td><td style="text-align:center"><span class="pill p2">P2</span></td></tr>
+          <tr><td><b>알림</b></td><td>데뷔·방송시작 푸시/디스코드</td><td>이벤트 트리거</td><td style="text-align:center"><span class="pill p2">P2</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="data">
+    <div class="eyebrow"><span class="num">05</span> 데이터</div>
+    <h2>데이터 소스 확보 전략</h2>
+    <p>플랫폼별 확보 난이도와 법적 조건이 크게 다르다. <strong>치지직이 데이터 확보의 중심축</strong>이며, Twitch는 한국 철수(2024.2)로 사실상 제외한다.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>플랫폼</th><th>방송여부</th><th>시청자</th><th>라이브목록</th><th>과거통계</th><th>종합 판단</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><b>치지직</b></td>
+            <td><span class="pill ok">가능</span></td><td><span class="pill ok">가능</span></td><td><span class="pill ok">가능</span></td><td><span class="pill no">자체축적</span></td>
+            <td><b>★ 최우선.</b> 공식 OpenAPI + 비공식 다 열림</td>
+          </tr>
+          <tr>
+            <td><b>SOOP</b></td>
+            <td><span class="pill ok">가능</span></td><td><span class="pill part">주의</span></td><td><span class="pill ok">가능</span></td><td><span class="pill no">불가</span></td>
+            <td>공식은 제휴심사 → 초기 <b>비공식 의존</b></td>
+          </tr>
+          <tr>
+            <td><b>YouTube</b></td>
+            <td><span class="pill part">RSS+배치</span></td><td><span class="pill ok">가능</span></td><td><span class="pill part">quota</span></td><td><span class="pill ok">저장허용</span></td>
+            <td>아카이브·구독자 <b>보조</b></td>
+          </tr>
+          <tr>
+            <td><b>Twitch</b></td>
+            <td colspan="4" style="color:var(--ink-3)">한국 철수 · 24h 캐시만 · 재배포 금지</td>
+            <td><b>제외</b></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>확보 방식 3단계 분류</h3>
+    <div class="grid three" style="margin-top:14px">
+      <div class="card">
+        <p style="margin:0 0 8px"><span class="pill ok">🟢 직접 확보</span></p>
+        <p style="font-size:14px;color:var(--ink-2);margin:0">치지직 공식 API(라이브·동접·팔로워·신규감지), YouTube 통계(장기저장 허용), Holodex 무료 API(해외)</p>
+      </div>
+      <div class="card">
+        <p style="margin:0 0 8px"><span class="pill gray">🟡 링크만</span></p>
+        <p style="font-size:14px;color:var(--ink-2);margin:0">Streams Charts·소프트콘(데이터 통합은 유료/ND 라이선스), Playboard·vling(API 없음) → 딥링크·출처표기</p>
+      </div>
+      <div class="card">
+        <p style="margin:0 0 8px"><span class="pill part">🟠 회색지대</span></p>
+        <p style="font-size:14px;color:var(--ink-2);margin:0">SOOP·치지직 비공식 엔드포인트. 동작하나 차단 가능 → 공개 통계 한정 + 낮은 폴링 + 캐싱으로 관리</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="label">아키텍처를 강제하는 2가지 제약</span>
+      <p><strong>① 과거 통계는 어느 API도 안 준다.</strong> 치지직·SOOP 모두 시계열 미제공 → <strong>1~5분 주기 폴링으로 자체 DB에 시계열을 쌓는 것이 필수 전제.</strong></p>
+      <p style="margin-bottom:0"><strong>② YouTube <code style="font-family:var(--font-mono);font-size:12.5px">search.list</code> 폴링 금지.</strong> 채널 100개만 조회해도 하루 quota(10,000) 소진. 반드시 <strong>RSS 피드(무료)로 후보 발견 → <code style="font-family:var(--font-mono);font-size:12.5px">videos.list</code> 50개 배치(1 unit)로 확정</strong> 조합을 쓴다.</p>
+    </div>
+  </section>
+
+  <section id="arch">
+    <div class="eyebrow"><span class="num">06</span> 아키텍처</div>
+    <h2>수집 파이프라인</h2>
+    <p>핵심은 "폴링 → 정규화 → 시계열 축적 → 감지 → 서빙"의 단방향 흐름. 각 플랫폼 수집기(collector)는 플러그인처럼 붙인다.</p>
+    <div class="pipe">
+      <div class="pipe-step"><div class="n">01 COLLECT</div><h4>플랫폼 수집기</h4><p>치지직/SOOP/YouTube 수집기가 주기적으로 라이브 목록·동접·프로필 폴링</p></div>
+      <div class="pipe-step"><div class="n">02 NORMALIZE</div><h4>정규화</h4><p>플랫폼별 응답을 공통 스키마(채널·라이브·지표)로 변환</p></div>
+      <div class="pipe-step"><div class="n">03 STORE</div><h4>시계열 저장</h4><p>스냅샷을 시계열 DB에 축적. 원본 캐시는 단기 폐기</p></div>
+      <div class="pipe-step"><div class="n">04 DETECT</div><h4>감지 엔진</h4><p>신규 채널·급상승·데뷔 이벤트 판정 → 이벤트 테이블 기록</p></div>
+      <div class="pipe-step"><div class="n">05 SERVE</div><h4>API · 웹</h4><p>캐시된 뷰를 프론트에 서빙 (현황·랭킹·데뷔·이슈)</p></div>
+    </div>
+
+    <h3>기술 스택 제안 <span style="font-weight:500;color:var(--ink-3);font-size:14px">(확정 아님 — 논의 대상)</span></h3>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>레이어</th><th>후보</th><th>이유</th></tr></thead>
+        <tbody>
+          <tr><td>수집 스케줄러</td><td>Node/TS 또는 Python + cron/queue</td><td>기존 오픈소스(kimcore/chzzk=TS, python-chzzk) 재사용</td></tr>
+          <tr><td>데이터베이스</td><td>PostgreSQL (+ 시계열은 Timescale/파티셔닝)</td><td>관계형 + 시계열 축적을 한 곳에서</td></tr>
+          <tr><td>캐시</td><td>Redis</td><td>현재 라이브 상태·핫 뷰 캐싱, 폴링 부하 완화</td></tr>
+          <tr><td>백엔드 API</td><td>Node(NestJS/Fastify) 또는 Python(FastAPI)</td><td>수집기와 언어 통일 시 유지보수 유리</td></tr>
+          <tr><td>프론트</td><td>Next.js (SSR/ISR)</td><td>SEO 필수(이슈·데뷔 검색유입) + AdSense 친화</td></tr>
+          <tr><td>호스팅</td><td>VPS 또는 컨테이너(수집기 상주 필요)</td><td>서버리스는 상시 폴링에 부적합</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout data">
+      <span class="label">SEO / AdSense 고려</span>
+      <p style="margin-bottom:0">단순 스크래핑 집계는 <strong>"thin content"로 AdSense 승인 거절</strong> 위험. 데이터 위에 자체 텍스트(데뷔 소개·이슈 정리·주간 요약)를 얹고, <strong>SSR로 검색 노출</strong>을 확보해야 트래픽·승인 양쪽에 유리하다.</p>
+    </div>
+  </section>
+
+  <section id="detect">
+    <div class="eyebrow"><span class="num">07</span> 감지 로직</div>
+    <h2>신규 데뷔 · 급상승은 어떻게 잡나</h2>
+    <h3>신규 데뷔 감지</h3>
+    <ul>
+      <li><strong>발견</strong> — 치지직 라이브 목록(<code style="font-family:var(--font-mono);font-size:12.5px">/open/v1/lives</code>)을 폴링하며 <strong>DB에 없는 channelId 등장 = 신규 후보</strong> 등록 (YouTube quota 문제 없음, 가장 쉬운 경로)</li>
+      <li><strong>판정</strong> — 단일 신호 금지. <strong>개설일 + 과거 이력 부재 + 데뷔 키워드("데뷔/첫방송/初配信/debut") + 구독자·동접 급증</strong>을 가중 결합</li>
+      <li><strong>검수</strong> — 완전 자동보다 <strong>커뮤니티 제보 + 사람 검수</strong> 혼합 (Holodex·HoloList 공통 패턴)</li>
+    </ul>
+    <h3>급상승 감지</h3>
+    <ul>
+      <li><strong>원칙: 절대값이 아닌 변화율·속도.</strong> 대형 채널 편향 방지</li>
+      <li><strong>규모 보정</strong> — 동일 팔로워 규모 코호트 내 백분위 순위 (SullyGnome 방식)</li>
+      <li><strong>기법</strong> — 이동평균 baseline 대비 z-score, 또는 EWMA 이중 창(단기 5분 vs 장기 24시간)</li>
+      <li><strong>다지표 결합</strong> — 시청자만 X. (동접 + 평균시청자 + 채팅량) 동반 상승으로 판정 (소프트콘 20/40/40 참고)</li>
+    </ul>
+  </section>
+
+  <section id="risk">
+    <div class="eyebrow"><span class="num">08</span> 리스크</div>
+    <h2>법적 · 약관 · 운영 리스크</h2>
+    <ul>
+      <li><strong>YouTube</strong> — 원본 30일 저장 한도, 단 <strong>통계 수치는 예외로 장기 보관 허용</strong>(랭킹 근거). 출처·브랜드 표기 필수</li>
+      <li><strong>Holodex</strong> — 무료·출처표기·<strong>비경쟁</strong> 조건. "홀로덱스 복제 경쟁 서비스"로 보이면 위반 → 한국 특화 자체 가치 필수</li>
+      <li><strong>소프트콘</strong> — Basic도 CC BY-<strong>ND</strong>(변형금지) → 가공 집계엔 부적합. 상업 활용은 제휴 문의</li>
+      <li><strong>비공식 API</strong> — 예고 없이 변경·차단 가능. 공개 통계 한정 + 낮은 폴링 + 개인정보/저작물 저장 회피</li>
+      <li><strong>팬덤 민감성</strong> — "순위 박제"가 갈등을 유발한다는 여론(덥덥미 사례). 버튜버는 더 민감 → vs 구도보다 <b>정보·발견 톤</b>으로 설계</li>
+    </ul>
+  </section>
+
+  <section id="roadmap">
+    <div class="eyebrow"><span class="num">09</span> 로드맵</div>
+    <h2>단계별 계획</h2>
+    <div class="roadmap">
+      <div class="phase">
+        <div class="when">0단계<small>검증</small></div>
+        <div>
+          <h3>데이터 실현성 스파이크</h3>
+          <ul>
+            <li>치지직 공식 API 키 발급 + 라이브 목록·동접 실측 확인</li>
+            <li>폴링 → DB 축적 최소 프로토타입 (스키마 검증)</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="when">1단계<small>MVP</small></div>
+        <div>
+          <h3>치지직 실시간 허브</h3>
+          <ul>
+            <li>실시간 방송 현황 + 신규 데뷔 감지 + 이슈 타임라인 (P0 3종)</li>
+            <li>SSR 프론트 + 기본 SEO, AdSense 신청 요건 충족</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="when">2단계<small>확장</small></div>
+        <div>
+          <h3>랭킹 · SOOP · 급상승</h3>
+          <ul>
+            <li>축적된 시계열로 동접/시청시간 랭킹·차트</li>
+            <li>SOOP 통합, 급상승 감지 엔진</li>
+          </ul>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="when">3단계<small>심화</small></div>
+        <div>
+          <h3>프로필 · 멀티뷰 · 알림</h3>
+          <ul>
+            <li>버튜버 통합 프로필, 멀티뷰, 데뷔·방송 알림</li>
+            <li>커뮤니티 제보·검수 워크플로 고도화</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="open">
+    <div class="eyebrow"><span class="num">10</span> 결정 대기</div>
+    <h2>아직 정할 것들</h2>
+    <div class="q"><span class="qid">Q1</span><div class="qbody"><b>MVP 스코프 확정</b><span>P0 3종(현황·데뷔·이슈)으로 갈지, 랭킹을 먼저 넣을지</span></div></div>
+    <div class="q"><span class="qid">Q2</span><div class="qbody"><b>기술 스택 확정</b><span>수집기·백엔드 언어(TS vs Python), DB, 호스팅 선택</span></div></div>
+    <div class="q"><span class="qid">Q3</span><div class="qbody"><b>이슈 타임라인 운영</b><span>수동 큐레이션 범위·기준, 제보 수집 방식, 명예훼손 리스크 가이드</span></div></div>
+    <div class="q"><span class="qid">Q4</span><div class="qbody"><b>버튜버 정의·판정</b><span>"버튜버"를 어떻게 분류/등록할지 (태그·소속사 목록·제보 검수)</span></div></div>
+    <div class="q"><span class="qid">Q5</span><div class="qbody"><b>브랜드·도메인</b><span>가칭 확정(버모아 등), 도메인 확보, 로고·톤앤매너</span></div></div>
+  </section>
+
+  <div class="foot">
+    <p>이 문서는 v0.1 초안입니다. 데이터 소스 조사(치지직·SOOP·YouTube·Twitch·3rd-party·감지 방법론) 결과를 종합해 작성했으며, 각 플랫폼 약관은 변동될 수 있어 런칭 전 재확인이 필요합니다.</p>
+    <p>참고 서비스: <a href="https://wwme.kr/">덥덥미</a> · <a href="https://holodex.net">Holodex</a> · <a href="https://streamscharts.com/vtubers">Streams Charts</a> · <a href="https://viewership.softc.one/">소프트콘 뷰어십</a> · <a href="https://mysmallvtuber.net/">나의 작은 버튜버</a></p>
+  </div>
+
+</div>
