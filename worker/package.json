@@ -1,0 +1,17 @@
+{
+  "name": "vmoa-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "VMOA 수집 워커 — 플랫폼 라이브 폴링 → 정규화 → 저장 → 감지",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}
