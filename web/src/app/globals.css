@@ -110,6 +110,15 @@
   }
 }
 
+/* 가로 스크롤 시 스크롤바 숨김 (모바일 네비 등) */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* 이슈 본문(마크다운 렌더) 타이포그래피 */
 .issue-content {
   font-size: 15px;

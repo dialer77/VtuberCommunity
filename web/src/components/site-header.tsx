@@ -16,7 +16,7 @@ export function SiteHeader() {
             VMOA
           </span>
         </Link>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 min-w-0">
           <NavLinks />
           <ThemeToggle />
         </div>
