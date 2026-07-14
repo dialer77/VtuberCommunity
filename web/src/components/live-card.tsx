@@ -19,12 +19,22 @@ export function LiveCard({ stream }: { stream: LiveStream }) {
           background: `radial-gradient(120% 120% at 20% 0%, ${color}26, transparent 55%), var(--surface-2)`,
         }}
       >
-        <span
-          aria-hidden
-          className="absolute inset-0 flex items-center justify-center text-7xl font-black text-foreground/[0.06] select-none"
-        >
-          {initial}
-        </span>
+        {stream.thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={stream.thumbnailUrl}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="absolute inset-0 flex items-center justify-center text-7xl font-black text-foreground/[0.06] select-none"
+          >
+            {initial}
+          </span>
+        )}
         <span className="absolute top-2 left-2 inline-flex items-center gap-1.5 rounded-md bg-live px-2 py-0.5 text-[11px] font-bold text-white shadow-sm">
           <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
           LIVE
