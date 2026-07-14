@@ -28,8 +28,14 @@ export interface DebutItem {
 }
 
 function channelUrl(platform: Platform, channelId: string): string {
-  if (platform === "chzzk") return `https://chzzk.naver.com/live/${channelId}`;
-  return "#";
+  switch (platform) {
+    case "chzzk":
+      return `https://chzzk.naver.com/live/${channelId}`;
+    case "soop":
+      return `https://play.sooplive.co.kr/${channelId}`;
+    case "youtube":
+      return `https://www.youtube.com/channel/${channelId}`;
+  }
 }
 
 /**
