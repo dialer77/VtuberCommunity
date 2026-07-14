@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getIssues } from "@/lib/data";
+import { PageHeader } from "@/components/page-header";
 import { formatDate } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -16,19 +17,17 @@ export default async function IssueListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-extrabold tracking-tight">이슈 타임라인</h1>
-        <p className="text-sm text-muted">
-          씬에 흩어진 사건을 한 곳에 정리한 큐레이션 아카이브.
-        </p>
-      </header>
+      <PageHeader
+        title="이슈 타임라인"
+        description="씬에 흩어진 사건을 한 곳에 정리한 큐레이션 아카이브."
+      />
 
-      <ul className="flex flex-col gap-4">
+      <ul className="flex flex-col gap-3">
         {issues.map((issue) => (
           <li key={issue.slug}>
             <Link
               href={`/issue/${issue.slug}`}
-              className="block rounded-xl border border-border bg-surface p-5 hover:border-accent/60 transition-colors"
+              className="group block rounded-xl border border-border bg-surface p-5 transition-colors hover:border-accent/60"
             >
               <div className="flex items-center gap-2 mb-1.5">
                 <time className="text-xs text-muted-2 tabular-nums">
@@ -43,7 +42,9 @@ export default async function IssueListPage() {
                   </span>
                 ))}
               </div>
-              <h2 className="font-bold leading-snug">{issue.title}</h2>
+              <h2 className="font-bold leading-snug group-hover:text-accent transition-colors">
+                {issue.title}
+              </h2>
               <p className="text-sm text-muted mt-1 line-clamp-2">
                 {issue.summary}
               </p>

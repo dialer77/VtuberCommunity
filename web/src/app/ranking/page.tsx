@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { getLiveStreams } from "@/lib/data";
+import { PageHeader } from "@/components/page-header";
 import { PlatformBadge } from "@/components/platform-badge";
+import { Avatar } from "@/components/avatar";
 import { formatCount } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -16,27 +18,27 @@ export default async function RankingPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="text-2xl font-extrabold tracking-tight">실시간 랭킹</h1>
-        <p className="text-sm text-muted">현재 동시 시청자 기준.</p>
+      <div className="flex flex-col gap-2">
+        <PageHeader title="실시간 랭킹" description="현재 동시 시청자 기준." live />
         <p className="text-xs text-muted-2">
           ※ 시계열 데이터 축적 후 시청시간·급상승 랭킹(P1)으로 확장 예정.
         </p>
-      </header>
+      </div>
 
-      <ol className="flex flex-col">
+      <ol className="flex flex-col rounded-xl border border-border bg-surface overflow-hidden">
         {lives.map((s, i) => (
           <li
             key={s.id}
-            className="flex items-center gap-4 py-3 border-b border-border last:border-b-0"
+            className="flex items-center gap-3 p-3 border-b border-border last:border-b-0 transition-colors hover:bg-surface-2/60"
           >
             <span
-              className={`w-8 shrink-0 text-center font-mono font-bold tabular-nums ${
+              className={`w-7 shrink-0 text-center font-mono font-bold tabular-nums ${
                 i < 3 ? "text-accent" : "text-muted-2"
               }`}
             >
               {i + 1}
             </span>
+            <Avatar name={s.vtuberName} platform={s.platform} size={36} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-semibold truncate">{s.vtuberName}</span>
@@ -46,7 +48,7 @@ export default async function RankingPage() {
             </div>
             <span className="shrink-0 font-semibold tabular-nums">
               {formatCount(s.viewers)}
-              <span className="text-muted-2 font-normal text-xs">명</span>
+              <span className="text-muted-2 font-normal text-xs ml-0.5">명</span>
             </span>
           </li>
         ))}
