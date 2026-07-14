@@ -1,17 +1,10 @@
 import type { LiveStream, Platform } from "@/types";
+import { isVtuber } from "@/lib/vtuber-registry";
 
 // 치지직 비공식 공개 API (인증 불필요). 지금 방송 중인 라이브 목록.
 // ⚠️ 비공식이라 예고 없이 변경/차단될 수 있음 → 실패 시 호출부에서 폴백 처리.
 const CHZZK_LIVES_URL =
   "https://api.chzzk.naver.com/service/v1/home/lives?size=50";
-
-// v1 버튜버 판정 휴리스틱 (문서 Q4: 버튜버 정의·판정).
-// 지금은 태그/제목의 키워드로 걸러낸다. 추후 "큐레이션된 채널 레지스트리"로 대체 예정.
-const VTUBER_HINTS = [
-  "버추얼", "버츄얼", "버튜버", "vtuber", "virtual",
-  "스텔라이브", "이세계아이돌", "왁타버스", "프리즘", "클로버클럽",
-  "러블릿", "라이브온", "v&u", "츠라이브", "아카데미",
-];
 
 interface ChzzkLive {
   liveTitle: string;
@@ -25,11 +18,6 @@ interface ChzzkLive {
     channelName: string;
     channelImageUrl: string | null;
   };
-}
-
-function isLikelyVtuber(live: ChzzkLive): boolean {
-  const hay = [live.liveTitle, ...(live.tags ?? [])].join(" ").toLowerCase();
-  return VTUBER_HINTS.some((h) => hay.includes(h));
 }
 
 function toThumbUrl(raw: string | null): string | null {
@@ -54,7 +42,13 @@ export async function fetchChzzkLives(): Promise<LiveStream[]> {
   const list: ChzzkLive[] = json?.content?.streamingLiveList ?? [];
 
   return list
-    .filter(isLikelyVtuber)
+    .filter((l) =>
+      isVtuber({
+        channelId: l.channel.channelId,
+        title: l.liveTitle,
+        tags: l.tags ?? [],
+      }),
+    )
     .map<LiveStream>((l) => ({
       id: `chzzk-${l.channel.channelId}`,
       vtuberId: l.channel.channelId,
