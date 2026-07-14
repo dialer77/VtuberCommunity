@@ -1,5 +1,5 @@
 import { collectors } from "./collectors";
-import { detectDebutCandidates } from "./detect/debut";
+import { debutCandidates } from "./detect/debut";
 import type { Store } from "./store/types";
 import type { LiveSnapshot } from "./domain";
 import { log } from "./log";
@@ -34,12 +34,12 @@ export async function runCycle(store: Store, cycle: number): Promise<void> {
   await store.saveSnapshots(snapshots);
 
   // 4. DETECT — 신규 채널(first-seen) = 데뷔 후보
-  const newIds = await store.markChannelsSeen(snapshots.map((s) => s.channelId));
-  const debuts = detectDebutCandidates(newIds, snapshots);
+  const newly = await store.markNewChannels(snapshots);
+  const debuts = debutCandidates(newly);
 
   const totalViewers = snapshots.reduce((s, x) => s + x.viewers, 0);
   log.info(
-    `#${cycle} 수집 ${snapshots.length}건 · 시청자 ${totalViewers.toLocaleString("ko-KR")} · 신규채널 ${newIds.length}`,
+    `#${cycle} 수집 ${snapshots.length}건 · 시청자 ${totalViewers.toLocaleString("ko-KR")} · 신규채널 ${newly.length}`,
   );
   for (const d of debuts) {
     log.event(`  🎉 데뷔 후보: ${d.channelName} (${d.platform}) — "${d.title}"`);

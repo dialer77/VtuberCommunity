@@ -9,6 +9,7 @@ const CHZZK_LIVES_URL =
 
 interface ChzzkLive {
   liveTitle: string;
+  liveImageUrl: string | null;
   concurrentUserCount: number;
   openDate: string; // "2026-07-14 13:03:14" (KST)
   tags: string[] | null;
@@ -43,10 +44,16 @@ export class ChzzkCollector implements Collector {
         category: l.liveCategoryValue,
         viewers: l.concurrentUserCount,
         startedAt: kstToISO(l.openDate),
+        thumbnailUrl: toThumbUrl(l.liveImageUrl),
       }));
   }
 }
 
 function kstToISO(s: string): string {
   return new Date(s.replace(" ", "T") + "+09:00").toISOString();
+}
+
+function toThumbUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  return raw.includes("{type}") ? raw.replace("{type}", "480") : raw;
 }

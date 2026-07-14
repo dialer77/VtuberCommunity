@@ -1,9 +1,9 @@
 {
-  "name": "vmoa-worker",
+  "name": "vmoa-server",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "VMOA 수집 워커 — 플랫폼 라이브 폴링 → 정규화 → 저장 → 감지",
+  "description": "VMOA 백엔드 — 수집 스케줄러 + 자체 DB(SQLite) + REST API",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
@@ -13,5 +13,8 @@
     "@types/node": "^24",
     "tsx": "^4",
     "typescript": "^5"
+  },
+  "dependencies": {
+    "fastify": "^5.10.0"
   }
 }

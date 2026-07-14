@@ -1,5 +1,5 @@
-// 워커 도메인 모델.
-// (추후 web/src/types 와 함께 packages/types 로 추출해 공유 예정 — 지금은 워커 로컬 정의)
+// 백엔드 도메인 모델.
+// (추후 web/src/types 와 함께 packages/types 로 추출해 공유 예정 — 지금은 로컬 정의)
 
 export type Platform = "chzzk" | "soop" | "youtube";
 
@@ -11,6 +11,7 @@ export interface RawLive {
   category: string | null;
   viewers: number;
   startedAt: string; // ISO
+  thumbnailUrl: string | null;
 }
 
 /** 한 번의 폴링에서 관측한 라이브 스냅샷 (STORE 대상, 시계열의 한 점) */
