@@ -1,4 +1,10 @@
-import type { LiveStream, DebutEvent, Platform } from "@/types";
+import type {
+  LiveStream,
+  DebutEvent,
+  Platform,
+  RankingEntry,
+  RisingEntry,
+} from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
 const BASE = process.env.BACKEND_URL ?? "http://localhost:4000";
@@ -55,4 +61,30 @@ export async function fetchDebutsFromBackend(): Promise<DebutEvent[]> {
     note: d.title,
     channelUrl: d.channelUrl,
   }));
+}
+
+export async function fetchRankingFromBackend(
+  windowMinutes = 180,
+  limit = 30,
+): Promise<RankingEntry[]> {
+  const res = await fetch(
+    `${BASE}/api/ranking?window=${windowMinutes}&limit=${limit}`,
+    { cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`backend /api/ranking ${res.status}`);
+  const json = (await res.json()) as { ranking?: RankingEntry[] };
+  return json.ranking ?? [];
+}
+
+export async function fetchRisingFromBackend(
+  windowMinutes = 60,
+  limit = 10,
+): Promise<RisingEntry[]> {
+  const res = await fetch(
+    `${BASE}/api/rising?window=${windowMinutes}&limit=${limit}`,
+    { cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`backend /api/rising ${res.status}`);
+  const json = (await res.json()) as { rising?: RisingEntry[] };
+  return json.rising ?? [];
 }

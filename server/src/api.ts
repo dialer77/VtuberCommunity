@@ -19,5 +19,19 @@ export function buildApi(store: SqliteStore) {
     return { count: debuts.length, debuts };
   });
 
+  // 시청자 랭킹 (윈도우 내 평균)
+  app.get("/api/ranking", async (req) => {
+    const q = req.query as { window?: string; limit?: string };
+    const ranking = store.getRanking(Number(q.window) || 180, Number(q.limit) || 30);
+    return { count: ranking.length, ranking };
+  });
+
+  // 급상승 (윈도우 내 변화율)
+  app.get("/api/rising", async (req) => {
+    const q = req.query as { window?: string; limit?: string };
+    const rising = store.getRising(Number(q.window) || 60, Number(q.limit) || 10);
+    return { count: rising.length, rising };
+  });
+
   return app;
 }

@@ -1,7 +1,18 @@
-import type { LiveStream, DebutEvent, Issue } from "@/types";
+import type {
+  LiveStream,
+  DebutEvent,
+  Issue,
+  RankingEntry,
+  RisingEntry,
+} from "@/types";
 import { RAW_LIVES, RAW_DEBUTS, ISSUES } from "@/lib/mock";
 import { fetchChzzkLives } from "@/lib/chzzk";
-import { fetchLivesFromBackend, fetchDebutsFromBackend } from "@/lib/backend";
+import {
+  fetchLivesFromBackend,
+  fetchDebutsFromBackend,
+  fetchRankingFromBackend,
+  fetchRisingFromBackend,
+} from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
 // 라이브/데뷔는 백엔드(자체 DB) 우선 → 백엔드 없으면 치지직 직접 → 목 폴백.
@@ -64,6 +75,34 @@ function mockDebutEvents(): DebutEvent[] {
     note: r.note,
     channelUrl: r.channelUrl,
   })).sort((a, b) => a.debutAt.localeCompare(b.debutAt));
+}
+
+export async function getRanking(): Promise<RankingEntry[]> {
+  try {
+    const ranking = await fetchRankingFromBackend();
+    if (ranking.length > 0) return ranking;
+  } catch {
+    // 백엔드 미기동 — 현재 라이브를 시청자순으로 폴백
+  }
+  const lives = await getLiveStreams();
+  return lives.map((l) => ({
+    channelId: l.vtuberId,
+    channelName: l.vtuberName,
+    platform: l.platform,
+    avgViewers: l.viewers,
+    peakViewers: l.viewers,
+    samples: 1,
+    title: l.title,
+    channelUrl: l.channelUrl,
+  }));
+}
+
+export async function getRising(): Promise<RisingEntry[]> {
+  try {
+    return await fetchRisingFromBackend();
+  } catch {
+    return []; // 백엔드 없으면 급상승 계산 불가
+  }
 }
 
 export async function getIssues(): Promise<Issue[]> {

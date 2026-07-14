@@ -27,6 +27,31 @@ export interface DebutItem {
   channelUrl: string;
 }
 
+/** 랭킹 아이템 (윈도우 내 평균/피크 시청자) */
+export interface RankingItem {
+  channelId: string;
+  channelName: string;
+  platform: Platform;
+  avgViewers: number;
+  peakViewers: number;
+  samples: number;
+  title: string | null;
+  channelUrl: string;
+}
+
+/** 급상승 아이템 (윈도우 내 시청자 변화율) */
+export interface RisingItem {
+  channelId: string;
+  channelName: string;
+  platform: Platform;
+  firstViewers: number;
+  latestViewers: number;
+  growth: number;
+  growthPct: number;
+  title: string | null;
+  channelUrl: string;
+}
+
 function channelUrl(platform: Platform, channelId: string): string {
   switch (platform) {
     case "chzzk":
@@ -165,5 +190,78 @@ export class SqliteStore implements Store {
         channelUrl: channelUrl(platform, channelId),
       };
     });
+  }
+
+  /** 윈도우(분) 내 평균 시청자 기준 랭킹 */
+  getRanking(windowMinutes = 180, limit = 30): RankingItem[] {
+    const cutoff = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+    const rows = this.db
+      .prepare(`
+        SELECT ls.channel_id, ls.platform, ls.channel_name,
+          AVG(ls.viewers) AS avg_v, MAX(ls.viewers) AS peak_v, COUNT(*) AS samples,
+          (SELECT title FROM live_snapshots t
+           WHERE t.channel_id = ls.channel_id ORDER BY t.collected_at DESC LIMIT 1) AS title
+        FROM live_snapshots ls
+        WHERE ls.collected_at >= ?
+        GROUP BY ls.channel_id
+        ORDER BY avg_v DESC
+        LIMIT ?
+      `)
+      .all(cutoff, limit) as unknown as Array<Record<string, unknown>>;
+
+    return rows.map((r) => {
+      const platform = r.platform as Platform;
+      const channelId = r.channel_id as string;
+      return {
+        channelId,
+        channelName: r.channel_name as string,
+        platform,
+        avgViewers: Math.round(Number(r.avg_v)),
+        peakViewers: Number(r.peak_v),
+        samples: Number(r.samples),
+        title: (r.title as string | null) ?? null,
+        channelUrl: channelUrl(platform, channelId),
+      };
+    });
+  }
+
+  /** 윈도우(분) 내 시청자 증가율 기준 급상승 */
+  getRising(windowMinutes = 60, limit = 10): RisingItem[] {
+    const cutoff = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+    const rows = this.db
+      .prepare(`
+        SELECT c.channel_id, c.platform, c.name,
+          (SELECT viewers FROM live_snapshots WHERE channel_id = c.channel_id AND collected_at >= ? ORDER BY collected_at ASC LIMIT 1) AS first_v,
+          (SELECT viewers FROM live_snapshots WHERE channel_id = c.channel_id AND collected_at >= ? ORDER BY collected_at DESC LIMIT 1) AS last_v,
+          (SELECT COUNT(*) FROM live_snapshots WHERE channel_id = c.channel_id AND collected_at >= ?) AS samples,
+          (SELECT title FROM live_snapshots WHERE channel_id = c.channel_id ORDER BY collected_at DESC LIMIT 1) AS title
+        FROM channels c
+      `)
+      .all(cutoff, cutoff, cutoff) as unknown as Array<Record<string, unknown>>;
+
+    return rows
+      .map((r) => {
+        const first = Number(r.first_v ?? 0);
+        const last = Number(r.last_v ?? 0);
+        const platform = r.platform as Platform;
+        const channelId = r.channel_id as string;
+        return {
+          channelId,
+          channelName: r.name as string,
+          platform,
+          firstViewers: first,
+          latestViewers: last,
+          growth: last - first,
+          growthPct: first > 0 ? (last - first) / first : 0,
+          samples: Number(r.samples ?? 0),
+          title: (r.title as string | null) ?? null,
+          channelUrl: channelUrl(platform, channelId),
+        };
+      })
+      // 노이즈 제거: 최소 2표본 + 현재 100명 이상 + 실제 증가
+      .filter((x) => x.samples >= 2 && x.firstViewers > 0 && x.latestViewers >= 100 && x.growth > 0)
+      .sort((a, b) => b.growthPct - a.growthPct)
+      .slice(0, limit)
+      .map(({ samples: _samples, ...rest }) => rest);
   }
 }

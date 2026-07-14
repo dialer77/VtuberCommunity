@@ -51,6 +51,31 @@ export interface DebutEvent {
   channelUrl: string | null;
 }
 
+/** 랭킹 아이템 (윈도우 내 평균/피크 시청자) */
+export interface RankingEntry {
+  channelId: string;
+  channelName: string;
+  platform: Platform;
+  avgViewers: number;
+  peakViewers: number;
+  samples: number;
+  title: string | null;
+  channelUrl: string;
+}
+
+/** 급상승 아이템 (윈도우 내 시청자 변화율) */
+export interface RisingEntry {
+  channelId: string;
+  channelName: string;
+  platform: Platform;
+  firstViewers: number;
+  latestViewers: number;
+  growth: number;
+  growthPct: number;
+  title: string | null;
+  channelUrl: string;
+}
+
 /** 이슈 타임라인 아이템 (수동 큐레이션 콘텐츠) */
 export interface Issue {
   slug: string;
