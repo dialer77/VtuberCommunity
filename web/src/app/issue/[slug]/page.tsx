@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { marked } from "marked";
 import { getIssueBySlug, getIssueSlugs } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 
@@ -36,6 +37,8 @@ export default async function IssueDetailPage({
   const issue = await getIssueBySlug(slug);
   if (!issue) notFound();
 
+  const bodyHtml = await marked.parse(issue.body);
+
   return (
     <article className="max-w-2xl mx-auto flex flex-col gap-4">
       <Link
@@ -65,13 +68,10 @@ export default async function IssueDetailPage({
         <p className="text-muted">{issue.summary}</p>
       </header>
 
-      <div className="flex flex-col gap-4 leading-relaxed">
-        {issue.body.split("\n\n").map((para, i) => (
-          <p key={i} className="text-[15px]">
-            {para}
-          </p>
-        ))}
-      </div>
+      <div
+        className="issue-content"
+        dangerouslySetInnerHTML={{ __html: bodyHtml }}
+      />
     </article>
   );
 }

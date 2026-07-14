@@ -5,7 +5,8 @@ import type {
   RankingEntry,
   RisingEntry,
 } from "@/types";
-import { RAW_LIVES, RAW_DEBUTS, ISSUES } from "@/lib/mock";
+import { RAW_LIVES, RAW_DEBUTS } from "@/lib/mock";
+import { loadIssues, loadIssue, issueSlugs } from "@/lib/issues";
 import { fetchChzzkLives } from "@/lib/chzzk";
 import {
   fetchLivesFromBackend,
@@ -107,13 +108,13 @@ export async function getRising(): Promise<RisingEntry[]> {
 }
 
 export async function getIssues(): Promise<Issue[]> {
-  return [...ISSUES].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  return loadIssues();
 }
 
 export async function getIssueBySlug(slug: string): Promise<Issue | null> {
-  return ISSUES.find((i) => i.slug === slug) ?? null;
+  return loadIssue(slug);
 }
 
 export async function getIssueSlugs(): Promise<string[]> {
-  return ISSUES.map((i) => i.slug);
+  return issueSlugs();
 }

@@ -1,4 +1,4 @@
-import type { Platform, Issue } from "@/types";
+import type { Platform } from "@/types";
 
 // ⚠️ 임시 목(mock) 데이터. 실제로는 수집 파이프라인(COLLECT→NORMALIZE→STORE)이 채운다.
 // 이름·수치는 전부 자리표시용 예시.
@@ -42,29 +42,4 @@ export const RAW_DEBUTS: RawDebut[] = [
   { vtuberName: "라피스", platform: "youtube", debutDaysFromNow: -3, agency: null, note: "데뷔 후 구독 급상승 감지", channelUrl: "#" },
 ];
 
-export const ISSUES: Issue[] = [
-  {
-    slug: "stellaform-3rd-gen-announce",
-    title: "스텔라폼 3기생 데뷔 일정 공개",
-    summary: "신인 3인이 이번 주 순차 데뷔. 티저와 함께 데뷔 방송 시간표가 공개됐다.",
-    body: "스텔라폼이 공식 채널을 통해 3기생 3인의 데뷔 일정을 공개했다. 데뷔 방송은 치지직에서 순차 진행되며, 각 멤버의 티저 영상이 함께 업로드됐다.\n\n(※ 본문은 이슈 타임라인 기능의 자리표시 예시입니다. 실제 서비스에서는 사실관계를 검수한 큐레이션 콘텐츠가 들어갑니다.)",
-    tags: ["데뷔", "스텔라폼", "치지직"],
-    publishedAt: "2026-07-05T10:00:00+09:00",
-  },
-  {
-    slug: "chzzk-virtual-category-growth",
-    title: "치지직 '버추얼' 카테고리 월 시청시간 신기록",
-    summary: "치지직 버추얼 카테고리의 월간 누적 시청시간이 역대 최고치를 기록했다.",
-    body: "치지직 버추얼 카테고리의 성장세가 이어지고 있다. 신인 유입과 대형 스트리머의 이적이 맞물리며 시청 지표가 상승했다.\n\n(※ 자리표시 예시 본문)",
-    tags: ["치지직", "통계"],
-    publishedAt: "2026-07-03T14:30:00+09:00",
-  },
-  {
-    slug: "collab-relay-event",
-    title: "여름맞이 합동 릴레이 방송 성사",
-    summary: "여러 소속사·개인세 버튜버가 참여하는 대규모 합동 방송이 예고됐다.",
-    body: "소속사와 개인세를 아우르는 합동 릴레이 방송이 예고됐다. 참가자 명단과 순서가 공개되며 팬들의 관심이 집중되고 있다.\n\n(※ 자리표시 예시 본문)",
-    tags: ["콜라보", "이벤트"],
-    publishedAt: "2026-07-01T09:00:00+09:00",
-  },
-];
+// 이슈는 content/issues/*.md 로 이관됨 (lib/issues.ts 참고).

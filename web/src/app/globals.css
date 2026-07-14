@@ -109,3 +109,60 @@
     border-radius: 4px;
   }
 }
+
+/* 이슈 본문(마크다운 렌더) 타이포그래피 */
+.issue-content {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--foreground);
+}
+.issue-content > * + * {
+  margin-top: 1em;
+}
+.issue-content h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-top: 1.6em;
+}
+.issue-content h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-top: 1.4em;
+}
+.issue-content a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.issue-content strong {
+  font-weight: 700;
+}
+.issue-content ul,
+.issue-content ol {
+  padding-left: 1.4em;
+}
+.issue-content ul {
+  list-style: disc;
+}
+.issue-content ol {
+  list-style: decimal;
+}
+.issue-content li + li {
+  margin-top: 0.35em;
+}
+.issue-content li::marker {
+  color: var(--muted-2);
+}
+.issue-content blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 1em;
+  color: var(--muted);
+}
+.issue-content code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--surface-2);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+}
