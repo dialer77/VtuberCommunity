@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getLiveStreams } from "@/lib/data";
 import { LiveCard } from "@/components/live-card";
 import { Stat } from "@/components/stat";
+import { AdSlot } from "@/components/ad-slot";
 import { formatCount } from "@/lib/format";
 
 // 실시간 현황이라 캐시하지 않고 요청마다 렌더 (추후 짧은 revalidate로 조정).
@@ -37,6 +38,8 @@ export default async function HomePage() {
           <LiveCard key={s.id} stream={s} />
         ))}
       </section>
+
+      <AdSlot slot="home-mid" />
 
       <section className="grid gap-4 sm:grid-cols-2">
         <CtaCard

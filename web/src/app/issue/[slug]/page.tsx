@@ -4,6 +4,9 @@ import { notFound } from "next/navigation";
 import { marked } from "marked";
 import { getIssueBySlug, getIssueSlugs } from "@/lib/data";
 import { formatDate } from "@/lib/format";
+import { AdSlot } from "@/components/ad-slot";
+
+const SITE_URL = process.env.SITE_URL ?? "http://localhost:3000";
 
 // Next.js 16: params 는 Promise 이므로 await 해서 사용한다.
 type Params = Promise<{ slug: string }>;
@@ -39,6 +42,17 @@ export default async function IssueDetailPage({
 
   const bodyHtml = await marked.parse(issue.body);
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: issue.title,
+    description: issue.summary,
+    datePublished: issue.publishedAt,
+    keywords: issue.tags.join(", "),
+    url: `${SITE_URL}/issue/${issue.slug}`,
+    publisher: { "@type": "Organization", name: "버모아 VMOA" },
+  };
+
   return (
     <article className="max-w-2xl mx-auto flex flex-col gap-4">
       <Link
@@ -68,10 +82,15 @@ export default async function IssueDetailPage({
         <p className="text-muted">{issue.summary}</p>
       </header>
 
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div
         className="issue-content"
         dangerouslySetInnerHTML={{ __html: bodyHtml }}
       />
+      <AdSlot slot="issue-bottom" />
     </article>
   );
 }
