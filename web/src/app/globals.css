@@ -17,6 +17,7 @@
   --good: #158049;
 }
 
+/* 시스템 다크 (수동 지정이 없을 때) */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0c0c12;
@@ -35,6 +36,38 @@
   }
 }
 
+/* 수동 토글(우선순위: data-theme > 시스템) */
+:root[data-theme="light"] {
+  --background: #f6f6fa;
+  --surface: #ffffff;
+  --surface-2: #eeeef4;
+  --border: #e3e3ec;
+  --foreground: #191922;
+  --muted: #55556a;
+  --muted-2: #8b8ba2;
+  --accent: #da1a63;
+  --accent-fg: #ffffff;
+  --data: #0c7e93;
+  --live: #e01f36;
+  --rise: #c4780a;
+  --good: #158049;
+}
+:root[data-theme="dark"] {
+  --background: #0c0c12;
+  --surface: #16161f;
+  --surface-2: #1e1e2a;
+  --border: #2a2a38;
+  --foreground: #ececf4;
+  --muted: #a8a8be;
+  --muted-2: #6f6f89;
+  --accent: #ff4c86;
+  --accent-fg: #17070e;
+  --data: #37c4da;
+  --live: #ff5162;
+  --rise: #f0ab43;
+  --good: #3ecf80;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
@@ -49,7 +82,7 @@
   --color-live: var(--live);
   --color-rise: var(--rise);
   --color-good: var(--good);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-pretendard), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -58,6 +91,9 @@
   ::before,
   ::after {
     border-color: var(--border);
+  }
+  html {
+    color-scheme: light dark;
   }
   body {
     background: var(--background);

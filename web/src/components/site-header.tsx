@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { NavLinks } from "@/components/nav-links";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function SiteHeader() {
   return (
@@ -15,7 +16,10 @@ export function SiteHeader() {
             VMOA
           </span>
         </Link>
-        <NavLinks />
+        <div className="flex items-center gap-1">
+          <NavLinks />
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );
