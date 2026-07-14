@@ -27,6 +27,7 @@ interface BackendDebut {
   platform: Platform;
   firstSeenAt: string;
   title: string | null;
+  debutSignal: boolean;
   channelUrl: string;
 }
 
@@ -59,6 +60,7 @@ export async function fetchDebutsFromBackend(): Promise<DebutEvent[]> {
     debutAt: d.firstSeenAt,
     agency: null,
     note: d.title,
+    debutSignal: d.debutSignal,
     channelUrl: d.channelUrl,
   }));
 }

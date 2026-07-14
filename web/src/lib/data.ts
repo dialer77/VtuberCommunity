@@ -73,6 +73,7 @@ function mockDebutEvents(): DebutEvent[] {
     debutAt: new Date(now + r.debutDaysFromNow * 86_400_000).toISOString(),
     agency: r.agency,
     note: r.note,
+    debutSignal: /데뷔|첫 ?방송/.test(r.note ?? ""),
     channelUrl: r.channelUrl,
   })).sort((a, b) => a.debutAt.localeCompare(b.debutAt));
 }

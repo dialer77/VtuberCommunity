@@ -48,6 +48,8 @@ export interface DebutEvent {
   debutAt: string;
   agency: string | null;
   note: string | null;
+  /** 제목에 데뷔 키워드가 있어 "진짜 데뷔"로 추정되는지 */
+  debutSignal: boolean;
   channelUrl: string | null;
 }
 

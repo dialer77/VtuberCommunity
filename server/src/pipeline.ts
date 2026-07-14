@@ -1,5 +1,5 @@
 import { collectors } from "./collectors";
-import { debutCandidates } from "./detect/debut";
+import { debutCandidates, hasDebutSignal } from "./detect/debut";
 import type { Store } from "./store/types";
 import type { LiveSnapshot } from "./domain";
 import { log } from "./log";
@@ -42,6 +42,7 @@ export async function runCycle(store: Store, cycle: number): Promise<void> {
     `#${cycle} 수집 ${snapshots.length}건 · 시청자 ${totalViewers.toLocaleString("ko-KR")} · 신규채널 ${newly.length}`,
   );
   for (const d of debuts) {
-    log.event(`  🎉 데뷔 후보: ${d.channelName} (${d.platform}) — "${d.title}"`);
+    const mark = hasDebutSignal(d.title) ? "🎀 데뷔 방송" : "🆕 신규 채널";
+    log.event(`  ${mark}: ${d.channelName} (${d.platform}) — "${d.title}"`);
   }
 }

@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Store } from "./types";
 import type { LiveSnapshot, Platform } from "../domain";
+import { hasDebutSignal } from "../detect/debut";
 
 /** API가 반환하는 라이브 아이템 (웹 LiveStream 매핑이 쉬운 형태) */
 export interface LiveItem {
@@ -24,6 +25,8 @@ export interface DebutItem {
   platform: Platform;
   firstSeenAt: string;
   title: string | null;
+  /** 첫 관측 시 제목에 데뷔 키워드가 있었는지 (진짜 데뷔 추정) */
+  debutSignal: boolean;
   channelUrl: string;
 }
 
@@ -83,7 +86,9 @@ export class SqliteStore implements Store {
         channel_id    TEXT PRIMARY KEY,
         platform      TEXT NOT NULL,
         name          TEXT NOT NULL,
-        first_seen_at TEXT NOT NULL
+        first_seen_at TEXT NOT NULL,
+        first_title   TEXT,
+        debut_signal  INTEGER NOT NULL DEFAULT 0
       );
       CREATE TABLE IF NOT EXISTS live_snapshots (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,6 +105,17 @@ export class SqliteStore implements Store {
       CREATE INDEX IF NOT EXISTS idx_snap_collected ON live_snapshots(collected_at);
       CREATE INDEX IF NOT EXISTS idx_snap_channel ON live_snapshots(channel_id, collected_at);
     `);
+    // 기존 DB 마이그레이션(컬럼 추가). 이미 있으면 무시.
+    this.safeAddColumn("channels", "first_title", "TEXT");
+    this.safeAddColumn("channels", "debut_signal", "INTEGER NOT NULL DEFAULT 0");
+  }
+
+  private safeAddColumn(table: string, col: string, type: string): void {
+    try {
+      this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+    } catch {
+      // 이미 존재하는 컬럼 — 무시
+    }
   }
 
   async saveSnapshots(snapshots: LiveSnapshot[]): Promise<void> {
@@ -126,12 +142,16 @@ export class SqliteStore implements Store {
 
   async markNewChannels(snapshots: LiveSnapshot[]): Promise<LiveSnapshot[]> {
     const stmt = this.db.prepare(`
-      INSERT OR IGNORE INTO channels (channel_id, platform, name, first_seen_at)
-      VALUES (?, ?, ?, ?)
+      INSERT OR IGNORE INTO channels
+        (channel_id, platform, name, first_seen_at, first_title, debut_signal)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
     const fresh: LiveSnapshot[] = [];
     for (const s of snapshots) {
-      const res = stmt.run(s.channelId, s.platform, s.channelName, s.collectedAt);
+      const signal = hasDebutSignal(s.title) ? 1 : 0;
+      const res = stmt.run(
+        s.channelId, s.platform, s.channelName, s.collectedAt, s.title, signal,
+      );
       if (Number(res.changes) > 0) fresh.push(s);
     }
     return fresh;
@@ -169,11 +189,11 @@ export class SqliteStore implements Store {
   getRecentDebuts(limit = 20): DebutItem[] {
     const rows = this.db
       .prepare(`
-        SELECT c.channel_id, c.platform, c.name, c.first_seen_at,
+        SELECT c.channel_id, c.platform, c.name, c.first_seen_at, c.debut_signal,
           (SELECT title FROM live_snapshots s
            WHERE s.channel_id = c.channel_id ORDER BY s.collected_at DESC LIMIT 1) AS title
         FROM channels c
-        ORDER BY c.first_seen_at DESC
+        ORDER BY c.debut_signal DESC, c.first_seen_at DESC
         LIMIT ?
       `)
       .all(limit) as unknown as Array<Record<string, unknown>>;
@@ -187,6 +207,7 @@ export class SqliteStore implements Store {
         platform,
         firstSeenAt: r.first_seen_at as string,
         title: (r.title as string | null) ?? null,
+        debutSignal: Number(r.debut_signal) === 1,
         channelUrl: channelUrl(platform, channelId),
       };
     });

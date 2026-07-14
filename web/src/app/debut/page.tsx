@@ -44,6 +44,11 @@ export default async function DebutPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h2 className="font-semibold truncate">{d.vtuberName}</h2>
+                  {d.debutSignal ? (
+                    <span className="shrink-0 rounded-full bg-accent/15 text-accent text-[11px] font-bold px-2 py-0.5">
+                      🎀 데뷔 방송
+                    </span>
+                  ) : null}
                   <PlatformBadge platform={d.platform} />
                 </div>
                 <p className="text-sm text-muted truncate">
