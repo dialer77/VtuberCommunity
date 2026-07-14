@@ -1,19 +1,28 @@
 import type { LiveStream, DebutEvent, Issue } from "@/types";
 import { RAW_LIVES, RAW_DEBUTS, ISSUES } from "@/lib/mock";
 import { fetchChzzkLives } from "@/lib/chzzk";
+import { fetchLivesFromBackend, fetchDebutsFromBackend } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
-// 라이브 현황은 치지직 실데이터를 직접 조회한다(추후 워커/DB 경유로 교체 가능).
-// 데뷔·이슈는 아직 목 데이터(데뷔 감지는 워커+DB 영역, 이슈는 수동 콘텐츠).
+// 라이브/데뷔는 백엔드(자체 DB) 우선 → 백엔드 없으면 치지직 직접 → 목 폴백.
+// 이슈는 아직 목 데이터(수동 콘텐츠).
 
 export async function getLiveStreams(): Promise<LiveStream[]> {
+  // 1) 백엔드(자체 DB) 우선
+  try {
+    const lives = await fetchLivesFromBackend();
+    if (lives.length > 0) return lives;
+  } catch {
+    // 백엔드 미기동 — 치지직 직접 조회로 폴백
+  }
+  // 2) 백엔드 없으면 치지직 직접
   try {
     const lives = await fetchChzzkLives();
     if (lives.length > 0) return lives;
-    console.warn("[data] 치지직 라이브 0건(휴리스틱 필터) — 목 데이터로 폴백");
   } catch (e) {
     console.error("[data] 치지직 조회 실패 — 목 데이터로 폴백:", e);
   }
+  // 3) 목
   return mockLiveStreams();
 }
 
@@ -34,6 +43,17 @@ function mockLiveStreams(): LiveStream[] {
 }
 
 export async function getDebutEvents(): Promise<DebutEvent[]> {
+  // 백엔드(자체 DB의 first-seen 채널) 우선, 없으면 목
+  try {
+    const debuts = await fetchDebutsFromBackend();
+    if (debuts.length > 0) return debuts;
+  } catch {
+    // 백엔드 미기동 — 목 폴백
+  }
+  return mockDebutEvents();
+}
+
+function mockDebutEvents(): DebutEvent[] {
   const now = Date.now();
   return RAW_DEBUTS.map((r, i) => ({
     id: `debut-${i}`,
