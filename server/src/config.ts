@@ -13,6 +13,10 @@ export const config = {
   dbPath: process.env.DB_PATH ?? "./data/vmoa.db",
   /** REST API 포트 (웹은 3000, 백엔드는 4000) */
   apiPort: Number(process.env.API_PORT ?? 4000),
+  /** 치지직 라이브 페이징 수 (50개/페이지). 클수록 버튜버 커버리지↑, 호출↑ */
+  chzzkPages: Number(process.env.CHZZK_PAGES ?? 8),
+  /** 스냅샷 보존 기간(일). 초과분은 자동 정리 (DB 무한 증가 방지) */
+  retentionDays: Number(process.env.RETENTION_DAYS ?? 7),
   /** Postgres 연결 문자열 (storeKind=postgres 일 때) */
   databaseUrl: process.env.DATABASE_URL ?? "",
 };

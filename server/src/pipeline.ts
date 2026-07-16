@@ -2,6 +2,7 @@ import { collectors } from "./collectors";
 import { debutCandidates, hasDebutSignal } from "./detect/debut";
 import type { Store } from "./store/types";
 import type { LiveSnapshot } from "./domain";
+import { config } from "./config";
 import { log } from "./log";
 
 /** 한 번의 폴링 사이클: COLLECT → NORMALIZE → STORE → DETECT */
@@ -44,5 +45,13 @@ export async function runCycle(store: Store, cycle: number): Promise<void> {
   for (const d of debuts) {
     const mark = hasDebutSignal(d.title) ? "🎀 데뷔 방송" : "🆕 신규 채널";
     log.event(`  ${mark}: ${d.channelName} (${d.platform}) — "${d.title}"`);
+  }
+
+  // 5. PRUNE — 보존 기간 초과 스냅샷 정리 (DB 무한 증가 방지)
+  if (store.pruneOldSnapshots) {
+    const removed = await store.pruneOldSnapshots(config.retentionDays);
+    if (removed > 0) {
+      log.info(`  오래된 스냅샷 ${removed}건 정리 (보존 ${config.retentionDays}일)`);
+    }
   }
 }

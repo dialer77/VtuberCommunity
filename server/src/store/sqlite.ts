@@ -157,6 +157,18 @@ export class SqliteStore implements Store {
     return fresh;
   }
 
+  /** 보존 기간(일)을 넘긴 스냅샷 삭제. DB 무한 증가 방지. */
+  async pruneOldSnapshots(retentionDays: number): Promise<number> {
+    if (!Number.isFinite(retentionDays) || retentionDays <= 0) return 0;
+    const cutoff = new Date(
+      Date.now() - retentionDays * 86_400_000,
+    ).toISOString();
+    const res = this.db
+      .prepare(`DELETE FROM live_snapshots WHERE collected_at < ?`)
+      .run(cutoff);
+    return Number(res.changes);
+  }
+
   /** 가장 최근 폴링 배치의 라이브 목록 (= 현재 방송중) */
   getCurrentLives(): LiveItem[] {
     const rows = this.db
