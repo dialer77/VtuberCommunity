@@ -35,6 +35,8 @@ export default async function RankingPage() {
               <a
                 key={r.channelId}
                 href={r.channelUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition-colors hover:border-rise/60"
               >
                 <Avatar name={r.channelName} platform={r.platform} size={36} />

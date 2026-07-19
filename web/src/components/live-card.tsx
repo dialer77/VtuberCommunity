@@ -10,6 +10,8 @@ export function LiveCard({ stream }: { stream: LiveStream }) {
   return (
     <a
       href={stream.channelUrl}
+      target="_blank"
+      rel="noopener noreferrer"
       className="group flex flex-col rounded-xl border border-border bg-surface overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-xl hover:shadow-black/[0.06]"
     >
       {/* 썸네일 영역 (실데이터 연결 전 플랫폼 컬러 기반 자리표시) */}
