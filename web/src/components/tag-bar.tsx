@@ -1,5 +1,12 @@
 import Link from "next/link";
-import type { TagCount } from "@/types";
+import type { TagCount, TagKind } from "@/types";
+
+const KIND_LABEL: Record<TagKind, string> = {
+  agency: "소속사",
+  concept: "컨셉",
+  content: "콘텐츠",
+};
+const KIND_ORDER: TagKind[] = ["agency", "concept", "content"];
 
 /** 서브컬처 태그 필터 바 — VMOA만의 큐레이션 분류. URL(?tag=)로 필터. */
 export function TagBar({
@@ -9,23 +16,38 @@ export function TagBar({
   tags: TagCount[];
   active?: string;
 }) {
-  const shown = tags
-    .filter((t) => t.count > 0)
-    .sort((a, b) => b.count - a.count);
+  const live = tags.filter((t) => t.count > 0);
+  if (live.length === 0) return null;
 
-  if (shown.length === 0) return null;
+  const groups = KIND_ORDER.map((kind) => ({
+    kind,
+    items: live
+      .filter((t) => t.kind === kind)
+      .sort((a, b) => b.count - a.count),
+  })).filter((g) => g.items.length > 0);
 
   return (
-    <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 py-1">
+    <div className="flex items-center gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 py-1">
       <Chip href="/" label="전체" active={!active} />
-      {shown.map((t) => (
-        <Chip
-          key={t.id}
-          href={`/?tag=${t.id}`}
-          label={`${t.emoji} ${t.label}`}
-          count={t.count}
-          active={active === t.id}
-        />
+      {groups.map((g, i) => (
+        <div key={g.kind} className="flex items-center gap-2 shrink-0">
+          <span
+            className={`shrink-0 text-[11px] font-semibold text-muted-2 ${
+              i > 0 ? "border-l border-border pl-3" : ""
+            }`}
+          >
+            {KIND_LABEL[g.kind]}
+          </span>
+          {g.items.map((t) => (
+            <Chip
+              key={t.id}
+              href={`/?tag=${t.id}`}
+              label={`${t.emoji} ${t.label}`}
+              count={t.count}
+              active={active === t.id}
+            />
+          ))}
+        </div>
       ))}
     </div>
   );
