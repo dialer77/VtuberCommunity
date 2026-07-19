@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getRanking, getRising } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { PlatformBadge } from "@/components/platform-badge";
@@ -32,11 +33,9 @@ export default async function RankingPage() {
           </h2>
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {rising.slice(0, 6).map((r) => (
-              <a
+              <Link
                 key={r.channelId}
-                href={r.channelUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/vtuber/${r.platform}/${r.channelId}`}
                 className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition-colors hover:border-rise/60"
               >
                 <Avatar name={r.channelName} platform={r.platform} size={36} />
@@ -54,7 +53,7 @@ export default async function RankingPage() {
                 <span className="shrink-0 text-sm font-bold text-rise tabular-nums">
                   +{Math.round(r.growthPct * 100)}%
                 </span>
-              </a>
+              </Link>
             ))}
           </div>
         </section>
@@ -64,10 +63,11 @@ export default async function RankingPage() {
         <h2 className="text-sm font-bold text-muted">시청자 랭킹</h2>
         <ol className="flex flex-col rounded-xl border border-border bg-surface overflow-hidden">
           {ranking.map((s, i) => (
-            <li
-              key={s.channelId}
-              className="flex items-center gap-3 p-3 border-b border-border last:border-b-0 transition-colors hover:bg-surface-2/60"
-            >
+            <li key={s.channelId} className="border-b border-border last:border-b-0">
+              <Link
+                href={`/vtuber/${s.platform}/${s.channelId}`}
+                className="flex items-center gap-3 p-3 transition-colors hover:bg-surface-2/60"
+              >
               <span
                 className={`w-7 shrink-0 text-center font-mono font-bold tabular-nums ${
                   i < 3 ? "text-accent" : "text-muted-2"
@@ -98,6 +98,7 @@ export default async function RankingPage() {
                   peak {formatCount(s.peakViewers)}
                 </div>
               </div>
+              </Link>
             </li>
           ))}
         </ol>

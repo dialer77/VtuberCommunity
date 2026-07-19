@@ -32,6 +32,33 @@ export interface DebutItem {
   channelUrl: string;
 }
 
+/** 한 번의 방송 세션 (started_at 으로 그룹핑한 스냅샷) */
+export interface Broadcast {
+  startedAt: string;
+  title: string | null;
+  category: string | null;
+  peakViewers: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+/** 채널 프로필 (DB에서 파생한 자동 데이터) */
+export interface ChannelProfile {
+  channelId: string;
+  platform: Platform;
+  name: string;
+  channelUrl: string;
+  firstSeenAt: string;
+  debutSignal: boolean;
+  isLive: boolean;
+  currentViewers: number | null;
+  currentTitle: string | null;
+  peakViewers: number;
+  broadcastCount: number;
+  rawTags: string[];
+  broadcasts: Broadcast[];
+}
+
 /** 랭킹 아이템 (윈도우 내 평균/피크 시청자) */
 export interface RankingItem {
   channelId: string;
@@ -170,6 +197,97 @@ export class SqliteStore implements Store {
       if (Number(res.changes) > 0) fresh.push(s);
     }
     return fresh;
+  }
+
+  /** 채널 프로필 — 채널 메타 + 현재 상태 + 통계 + 방송 기록(시계열 파생) */
+  getChannelProfile(channelId: string): ChannelProfile | null {
+    const ch = this.db
+      .prepare(
+        `SELECT channel_id, platform, name, first_seen_at, debut_signal
+         FROM channels WHERE channel_id = ?`,
+      )
+      .get(channelId) as Record<string, unknown> | undefined;
+    if (!ch) return null;
+
+    const platform = ch.platform as Platform;
+
+    const latestGlobal = (
+      this.db
+        .prepare(`SELECT MAX(collected_at) AS m FROM live_snapshots`)
+        .get() as { m: string | null }
+    ).m;
+
+    const current = this.db
+      .prepare(
+        `SELECT viewers, title, tags, collected_at
+         FROM live_snapshots WHERE channel_id = ?
+         ORDER BY collected_at DESC LIMIT 1`,
+      )
+      .get(channelId) as Record<string, unknown> | undefined;
+
+    const isLive =
+      !!current && !!latestGlobal && current.collected_at === latestGlobal;
+
+    const peak = (
+      this.db
+        .prepare(
+          `SELECT MAX(viewers) AS p FROM live_snapshots WHERE channel_id = ?`,
+        )
+        .get(channelId) as { p: number | null }
+    ).p;
+
+    const count = (
+      this.db
+        .prepare(
+          `SELECT COUNT(DISTINCT started_at) AS c FROM live_snapshots WHERE channel_id = ?`,
+        )
+        .get(channelId) as { c: number }
+    ).c;
+
+    const rows = this.db
+      .prepare(`
+        SELECT ls.started_at,
+          MAX(ls.viewers) AS peak,
+          MIN(ls.collected_at) AS first_at,
+          MAX(ls.collected_at) AS last_at,
+          (SELECT title FROM live_snapshots t
+           WHERE t.channel_id = ls.channel_id AND t.started_at = ls.started_at
+           ORDER BY t.collected_at DESC LIMIT 1) AS title,
+          (SELECT category FROM live_snapshots t
+           WHERE t.channel_id = ls.channel_id AND t.started_at = ls.started_at
+           ORDER BY t.collected_at DESC LIMIT 1) AS category
+        FROM live_snapshots ls
+        WHERE ls.channel_id = ?
+        GROUP BY ls.started_at
+        ORDER BY ls.started_at DESC
+        LIMIT 30
+      `)
+      .all(channelId) as unknown as Array<Record<string, unknown>>;
+
+    const broadcasts: Broadcast[] = rows.map((r) => ({
+      startedAt: (r.started_at as string | null) ?? "",
+      title: (r.title as string | null) ?? null,
+      category: (r.category as string | null) ?? null,
+      peakViewers: Number(r.peak),
+      firstSeenAt: (r.first_at as string | null) ?? "",
+      lastSeenAt: (r.last_at as string | null) ?? "",
+    }));
+
+    return {
+      channelId,
+      platform,
+      name: ch.name as string,
+      channelUrl: channelUrl(platform, channelId),
+      firstSeenAt: ch.first_seen_at as string,
+      debutSignal: Number(ch.debut_signal) === 1,
+      isLive,
+      currentViewers: isLive ? Number(current!.viewers) : null,
+      currentTitle: isLive ? ((current!.title as string | null) ?? null) : null,
+      peakViewers: Number(peak ?? 0),
+      broadcastCount: Number(count),
+      rawTags: isLive ? parseTags(current!.tags) : parseTags(current?.tags),
+      broadcasts,
+    };
   }
 
   /** 보존 기간(일)을 넘긴 스냅샷 삭제. DB 무한 증가 방지. */

@@ -6,6 +6,7 @@ import type {
   RisingEntry,
   VmoaTag,
   TagCount,
+  ChannelProfile,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -63,6 +64,19 @@ export async function fetchTags(): Promise<TagCount[]> {
   if (!res.ok) throw new Error(`backend /api/tags ${res.status}`);
   const json = (await res.json()) as { tags?: TagCount[] };
   return json.tags ?? [];
+}
+
+export async function fetchChannelProfile(
+  platform: string,
+  channelId: string,
+): Promise<ChannelProfile | null> {
+  const res = await fetch(
+    `${BASE}/api/channels/${encodeURIComponent(platform)}/${encodeURIComponent(channelId)}`,
+    { cache: "no-store" },
+  );
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`backend /api/channels ${res.status}`);
+  return (await res.json()) as ChannelProfile;
 }
 
 export async function fetchDebutsFromBackend(): Promise<DebutEvent[]> {

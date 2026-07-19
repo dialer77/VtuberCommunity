@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getDebutEvents } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { PlatformBadge } from "@/components/platform-badge";
@@ -27,10 +28,11 @@ export default async function DebutPage() {
           const cd = debutCountdown(d.debutAt);
           const upcoming = /D-|오늘|내일/.test(cd);
           return (
-            <li
-              key={d.id}
-              className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition-colors hover:border-accent/60"
-            >
+            <li key={d.id}>
+              <Link
+                href={`/vtuber/${d.platform}/${d.id}`}
+                className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 transition-colors hover:border-accent/60"
+              >
               <span
                 className={`w-14 shrink-0 rounded-lg px-2 py-1.5 text-center text-sm font-bold tabular-nums ${
                   upcoming
@@ -59,6 +61,7 @@ export default async function DebutPage() {
               <time className="shrink-0 text-xs text-muted-2 tabular-nums hidden sm:block">
                 {formatDateTime(d.debutAt)}
               </time>
+              </Link>
             </li>
           );
         })}

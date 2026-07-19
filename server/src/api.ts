@@ -6,6 +6,7 @@ import {
   tagById,
   type TagDef,
 } from "./tags/catalog";
+import { curatedProfile } from "./profiles";
 
 interface TagRef {
   id: string;
@@ -66,6 +67,22 @@ export function buildApi(store: SqliteStore) {
       count: counts.get(t.id) ?? 0,
     }));
     return { tags };
+  });
+
+  // 채널 프로필 (자동 데이터 + VMOA 태그 + 큐레이션 정보)
+  app.get("/api/channels/:platform/:channelId", async (req, reply) => {
+    const { channelId } = req.params as { platform: string; channelId: string };
+    const profile = store.getChannelProfile(channelId);
+    if (!profile) {
+      reply.code(404);
+      return { error: "채널을 찾을 수 없어요" };
+    }
+    const { rawTags, ...rest } = profile;
+    return {
+      ...rest,
+      tags: toTagRefs(resolveChannelTags(profile.channelId, rawTags)),
+      curated: curatedProfile(profile.channelId),
+    };
   });
 
   // 최근 감지된 신규 채널(데뷔 후보)

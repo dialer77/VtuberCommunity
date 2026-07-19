@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { LiveStream } from "@/types";
 import { PLATFORMS } from "@/types";
 import { PlatformBadge } from "@/components/platform-badge";
@@ -8,10 +9,8 @@ export function LiveCard({ stream }: { stream: LiveStream }) {
   const initial = stream.vtuberName.trim().charAt(0);
 
   return (
-    <a
-      href={stream.channelUrl}
-      target="_blank"
-      rel="noopener noreferrer"
+    <Link
+      href={`/vtuber/${stream.platform}/${stream.vtuberId}`}
       className="group flex flex-col rounded-xl border border-border bg-surface overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-xl hover:shadow-black/[0.06]"
     >
       {/* 썸네일 영역 (실데이터 연결 전 플랫폼 컬러 기반 자리표시) */}
@@ -85,6 +84,6 @@ export function LiveCard({ stream }: { stream: LiveStream }) {
           </div>
         ) : null}
       </div>
-    </a>
+    </Link>
   );
 }

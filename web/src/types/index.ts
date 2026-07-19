@@ -94,6 +94,41 @@ export interface RisingEntry {
   channelUrl: string;
 }
 
+/** 한 번의 방송 세션 (시계열에서 파생) */
+export interface Broadcast {
+  startedAt: string;
+  title: string | null;
+  category: string | null;
+  peakViewers: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+}
+
+/** 관리자 큐레이션 프로필 정보 */
+export interface CuratedProfile {
+  bio?: string;
+  schedule?: string;
+  links?: { label: string; url: string }[];
+}
+
+/** 스트리머 프로필 (자동 데이터 + 태그 + 큐레이션) */
+export interface ChannelProfile {
+  channelId: string;
+  platform: Platform;
+  name: string;
+  channelUrl: string;
+  firstSeenAt: string;
+  debutSignal: boolean;
+  isLive: boolean;
+  currentViewers: number | null;
+  currentTitle: string | null;
+  peakViewers: number;
+  broadcastCount: number;
+  tags: VmoaTag[];
+  curated: CuratedProfile;
+  broadcasts: Broadcast[];
+}
+
 /** 이슈 타임라인 아이템 (수동 큐레이션 콘텐츠) */
 export interface Issue {
   slug: string;

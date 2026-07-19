@@ -8,13 +8,14 @@ import type {
 import { RAW_LIVES, RAW_DEBUTS } from "@/lib/mock";
 import { loadIssues, loadIssue, issueSlugs } from "@/lib/issues";
 import { fetchChzzkLives } from "@/lib/chzzk";
-import type { TagCount } from "@/types";
+import type { TagCount, ChannelProfile } from "@/types";
 import {
   fetchLivesFromBackend,
   fetchDebutsFromBackend,
   fetchRankingFromBackend,
   fetchRisingFromBackend,
   fetchTags,
+  fetchChannelProfile,
 } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
@@ -45,6 +46,17 @@ export async function getTags(): Promise<TagCount[]> {
     return await fetchTags();
   } catch {
     return [];
+  }
+}
+
+export async function getChannelProfile(
+  platform: string,
+  channelId: string,
+): Promise<ChannelProfile | null> {
+  try {
+    return await fetchChannelProfile(platform, channelId);
+  } catch {
+    return null;
   }
 }
 
