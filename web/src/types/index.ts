@@ -24,6 +24,21 @@ export interface Vtuber {
   avatarUrl: string | null;
 }
 
+export type TagKind = "agency" | "concept" | "content";
+
+/** VMOA 서브컬처 태그 (소속사·컨셉·콘텐츠) */
+export interface VmoaTag {
+  id: string;
+  label: string;
+  emoji: string;
+  kind: TagKind;
+}
+
+/** 태그 + 현재 방송중 개수 (필터 바용) */
+export interface TagCount extends VmoaTag {
+  count: number;
+}
+
 /** 현재 진행 중인 라이브 방송 스냅샷 */
 export interface LiveStream {
   id: string;
@@ -37,6 +52,7 @@ export interface LiveStream {
   startedAt: string;
   thumbnailUrl: string | null;
   channelUrl: string;
+  tags: VmoaTag[];
 }
 
 /** 신규 데뷔 이벤트 (DETECT 단계에서 생성) */

@@ -4,6 +4,8 @@ import type {
   Platform,
   RankingEntry,
   RisingEntry,
+  VmoaTag,
+  TagCount,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -19,6 +21,7 @@ interface BackendLive {
   startedAt: string;
   thumbnailUrl: string | null;
   channelUrl: string;
+  tags: VmoaTag[];
 }
 
 interface BackendDebut {
@@ -31,8 +34,13 @@ interface BackendDebut {
   channelUrl: string;
 }
 
-export async function fetchLivesFromBackend(): Promise<LiveStream[]> {
-  const res = await fetch(`${BASE}/api/lives`, { cache: "no-store" });
+export async function fetchLivesFromBackend(
+  tag?: string,
+): Promise<LiveStream[]> {
+  const url = tag
+    ? `${BASE}/api/lives?tag=${encodeURIComponent(tag)}`
+    : `${BASE}/api/lives`;
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`backend /api/lives ${res.status}`);
   const json = (await res.json()) as { lives?: BackendLive[] };
   return (json.lives ?? []).map((l) => ({
@@ -46,7 +54,15 @@ export async function fetchLivesFromBackend(): Promise<LiveStream[]> {
     startedAt: l.startedAt,
     thumbnailUrl: l.thumbnailUrl,
     channelUrl: l.channelUrl,
+    tags: l.tags ?? [],
   }));
+}
+
+export async function fetchTags(): Promise<TagCount[]> {
+  const res = await fetch(`${BASE}/api/tags`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`backend /api/tags ${res.status}`);
+  const json = (await res.json()) as { tags?: TagCount[] };
+  return json.tags ?? [];
 }
 
 export async function fetchDebutsFromBackend(): Promise<DebutEvent[]> {

@@ -1,5 +1,37 @@
 import Fastify from "fastify";
-import type { SqliteStore } from "./store/sqlite";
+import type { SqliteStore, LiveItem } from "./store/sqlite";
+import {
+  TAG_CATALOG,
+  resolveChannelTags,
+  tagById,
+  type TagDef,
+} from "./tags/catalog";
+
+interface TagRef {
+  id: string;
+  label: string;
+  emoji: string;
+  kind: TagDef["kind"];
+}
+
+interface LiveWithTags extends Omit<LiveItem, "rawTags"> {
+  tags: TagRef[];
+}
+
+function toTagRefs(ids: string[]): TagRef[] {
+  const refs: TagRef[] = [];
+  for (const id of ids) {
+    const def = tagById(id);
+    if (def) refs.push({ id: def.id, label: def.label, emoji: def.emoji, kind: def.kind });
+  }
+  return refs;
+}
+
+function enrich(item: LiveItem): LiveWithTags {
+  const ids = resolveChannelTags(item.channelId, item.rawTags);
+  const { rawTags: _raw, ...rest } = item;
+  return { ...rest, tags: toTagRefs(ids) };
+}
 
 /** REST API — 웹(그리고 나중에 앱)이 소비하는 백엔드 엔드포인트. */
 export function buildApi(store: SqliteStore) {
@@ -7,10 +39,33 @@ export function buildApi(store: SqliteStore) {
 
   app.get("/health", async () => ({ ok: true, ts: new Date().toISOString() }));
 
-  // 현재 방송중 (최근 폴링 스냅샷)
-  app.get("/api/lives", async () => {
-    const lives = store.getCurrentLives();
+  // 현재 방송중 (+ VMOA 태그). ?tag=<id> 로 필터.
+  app.get("/api/lives", async (req) => {
+    const q = req.query as { tag?: string };
+    let lives = store.getCurrentLives().map(enrich);
+    if (q.tag) {
+      lives = lives.filter((l) => l.tags.some((t) => t.id === q.tag));
+    }
     return { count: lives.length, lives };
+  });
+
+  // 태그 카탈로그 + 현재 방송중 채널 기준 태그별 개수
+  app.get("/api/tags", async () => {
+    const lives = store.getCurrentLives();
+    const counts = new Map<string, number>();
+    for (const l of lives) {
+      for (const id of resolveChannelTags(l.channelId, l.rawTags)) {
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
+    }
+    const tags = TAG_CATALOG.map((t) => ({
+      id: t.id,
+      label: t.label,
+      emoji: t.emoji,
+      kind: t.kind,
+      count: counts.get(t.id) ?? 0,
+    }));
+    return { tags };
   });
 
   // 최근 감지된 신규 채널(데뷔 후보)

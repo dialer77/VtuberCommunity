@@ -60,6 +60,7 @@ export async function fetchChzzkLives(): Promise<LiveStream[]> {
       startedAt: kstToISO(l.openDate),
       thumbnailUrl: toThumbUrl(l.liveImageUrl),
       channelUrl: `https://chzzk.naver.com/live/${l.channel.channelId}`,
+      tags: [],
     }))
     .sort((a, b) => b.viewers - a.viewers);
 }

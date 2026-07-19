@@ -18,6 +18,21 @@ interface SoopBroad {
   broad_cate_name: string | null;
   broad_start: string; // "2026-07-14 18:33:01" (KST)
   broad_img: string | null;
+  hash_tags?: unknown;
+  af_tags?: unknown;
+}
+
+/** SOOP 태그 필드는 배열 또는 콤마 문자열로 올 수 있어 방어적으로 정규화 */
+function toTagArray(...sources: unknown[]): string[] {
+  const out: string[] = [];
+  for (const s of sources) {
+    if (Array.isArray(s)) {
+      for (const x of s) if (typeof x === "string" && x) out.push(x);
+    } else if (typeof s === "string" && s) {
+      out.push(...s.split(",").map((t) => t.trim()).filter(Boolean));
+    }
+  }
+  return [...new Set(out)];
 }
 
 export class SoopCollector implements Collector {
@@ -42,6 +57,7 @@ export class SoopCollector implements Collector {
         viewers: Number(b.total_view_cnt) || 0,
         startedAt: kstToISO(b.broad_start),
         thumbnailUrl: b.broad_img || null,
+        tags: toTagArray(b.hash_tags, b.af_tags),
       }));
   }
 }

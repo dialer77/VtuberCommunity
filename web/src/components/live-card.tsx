@@ -69,6 +69,19 @@ export function LiveCard({ stream }: { stream: LiveStream }) {
             {elapsedSince(stream.startedAt)}
           </span>
         </div>
+        {stream.tags.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {stream.tags.slice(0, 3).map((t) => (
+              <span
+                key={t.id}
+                className="text-[11px] rounded-full bg-accent/10 text-accent px-1.5 py-0.5"
+                title={t.label}
+              >
+                {t.emoji} {t.label}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
     </a>
   );

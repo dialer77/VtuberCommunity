@@ -62,6 +62,7 @@ export class ChzzkCollector implements Collector {
             viewers: l.concurrentUserCount,
             startedAt: kstToISO(l.openDate),
             thumbnailUrl: toThumbUrl(l.liveImageUrl),
+            tags: l.tags ?? [],
           });
         }
       }

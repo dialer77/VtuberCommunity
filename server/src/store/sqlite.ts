@@ -16,6 +16,8 @@ export interface LiveItem {
   startedAt: string;
   thumbnailUrl: string | null;
   channelUrl: string;
+  /** 플랫폼 자가 태그 (API에서 VMOA 태그로 변환) */
+  rawTags: string[];
 }
 
 /** API가 반환하는 데뷔(신규 감지) 아이템 */
@@ -53,6 +55,16 @@ export interface RisingItem {
   growthPct: number;
   title: string | null;
   channelUrl: string;
+}
+
+function parseTags(raw: unknown): string[] {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 function channelUrl(platform: Platform, channelId: string): string {
@@ -100,6 +112,7 @@ export class SqliteStore implements Store {
         viewers      INTEGER NOT NULL,
         started_at   TEXT,
         thumbnail_url TEXT,
+        tags         TEXT,
         collected_at TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_snap_collected ON live_snapshots(collected_at);
@@ -108,6 +121,7 @@ export class SqliteStore implements Store {
     // 기존 DB 마이그레이션(컬럼 추가). 이미 있으면 무시.
     this.safeAddColumn("channels", "first_title", "TEXT");
     this.safeAddColumn("channels", "debut_signal", "INTEGER NOT NULL DEFAULT 0");
+    this.safeAddColumn("live_snapshots", "tags", "TEXT");
   }
 
   private safeAddColumn(table: string, col: string, type: string): void {
@@ -122,15 +136,16 @@ export class SqliteStore implements Store {
     if (snapshots.length === 0) return;
     const stmt = this.db.prepare(`
       INSERT INTO live_snapshots
-        (channel_id, platform, channel_name, title, category, viewers, started_at, thumbnail_url, collected_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (channel_id, platform, channel_name, title, category, viewers, started_at, thumbnail_url, tags, collected_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     this.db.exec("BEGIN");
     try {
       for (const s of snapshots) {
         stmt.run(
           s.channelId, s.platform, s.channelName, s.title,
-          s.category, s.viewers, s.startedAt, s.thumbnailUrl, s.collectedAt,
+          s.category, s.viewers, s.startedAt, s.thumbnailUrl,
+          JSON.stringify(s.tags ?? []), s.collectedAt,
         );
       }
       this.db.exec("COMMIT");
@@ -173,7 +188,7 @@ export class SqliteStore implements Store {
   getCurrentLives(): LiveItem[] {
     const rows = this.db
       .prepare(`
-        SELECT channel_id, platform, channel_name, title, category, viewers, started_at, thumbnail_url
+        SELECT channel_id, platform, channel_name, title, category, viewers, started_at, thumbnail_url, tags
         FROM live_snapshots
         WHERE collected_at = (SELECT MAX(collected_at) FROM live_snapshots)
         ORDER BY viewers DESC
@@ -193,6 +208,7 @@ export class SqliteStore implements Store {
         startedAt: (r.started_at as string | null) ?? "",
         thumbnailUrl: (r.thumbnail_url as string | null) ?? null,
         channelUrl: channelUrl(platform, channelId),
+        rawTags: parseTags(r.tags),
       };
     });
   }

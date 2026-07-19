@@ -12,6 +12,8 @@ export interface RawLive {
   viewers: number;
   startedAt: string; // ISO
   thumbnailUrl: string | null;
+  /** 플랫폼에서 스트리머가 스스로 단 태그 (VMOA 태그 자동 부트스트랩용) */
+  tags: string[];
 }
 
 /** 한 번의 폴링에서 관측한 라이브 스냅샷 (STORE 대상, 시계열의 한 점) */
