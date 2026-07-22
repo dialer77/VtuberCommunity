@@ -7,6 +7,8 @@ import type {
   VmoaTag,
   TagCount,
   ChannelProfile,
+  CoinItem,
+  CoinSort,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -64,6 +66,18 @@ export async function fetchTags(): Promise<TagCount[]> {
   if (!res.ok) throw new Error(`backend /api/tags ${res.status}`);
   const json = (await res.json()) as { tags?: TagCount[] };
   return json.tags ?? [];
+}
+
+export async function fetchCoins(
+  sort: CoinSort = "cap",
+  limit = 50,
+): Promise<CoinItem[]> {
+  const res = await fetch(`${BASE}/api/coins?sort=${sort}&limit=${limit}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(`backend /api/coins ${res.status}`);
+  const json = (await res.json()) as { coins?: CoinItem[] };
+  return json.coins ?? [];
 }
 
 export async function fetchChannelProfile(

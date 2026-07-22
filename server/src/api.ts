@@ -98,6 +98,32 @@ export function buildApi(store: SqliteStore) {
     return { count: ranking.length, ranking };
   });
 
+  // V코인 시세판 (시청자 기반 지수 + 등락률). sort=cap|gainers|losers
+  app.get("/api/coins", async (req) => {
+    const q = req.query as { sort?: string; limit?: string; hours?: string };
+    const limit = Number(q.limit) || 50;
+    let coins = store.getCoinMarket(Number(q.hours) || 24);
+
+    // 급등/급락은 표본이 얕은 초소형 코인의 착시(시세 4 → +300%)를 걸러낸다
+    const MIN = 100;
+    const meaningful = (c: (typeof coins)[number]) =>
+      c.changePct != null && c.price >= MIN && (c.prevPrice ?? 0) >= MIN;
+
+    if (q.sort === "gainers") {
+      coins = coins
+        .filter(meaningful)
+        .sort((a, b) => (b.changePct ?? 0) - (a.changePct ?? 0));
+    } else if (q.sort === "losers") {
+      coins = coins
+        .filter(meaningful)
+        .sort((a, b) => (a.changePct ?? 0) - (b.changePct ?? 0));
+    } else {
+      coins = coins.sort((a, b) => b.price - a.price); // cap (시가총액=현재가순)
+    }
+
+    return { count: coins.length, coins: coins.slice(0, limit) };
+  });
+
   // 급상승 (윈도우 내 변화율)
   app.get("/api/rising", async (req) => {
     const q = req.query as { window?: string; limit?: string };

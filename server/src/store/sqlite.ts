@@ -59,6 +59,21 @@ export interface ChannelProfile {
   broadcasts: Broadcast[];
 }
 
+/** V코인 시세 아이템 (시청자 기반 지수 + 등락률) */
+export interface CoinItem {
+  channelId: string;
+  channelName: string;
+  platform: Platform;
+  channelUrl: string;
+  /** 현재가 = 최근 기간 평균 시청자 */
+  price: number;
+  /** 직전 기간 평균 시청자 (없으면 신규) */
+  prevPrice: number | null;
+  /** 등락률 (없으면 신규 상장) */
+  changePct: number | null;
+  isLive: boolean;
+}
+
 /** 랭킹 아이템 (윈도우 내 평균/피크 시청자) */
 export interface RankingItem {
   channelId: string;
@@ -388,6 +403,60 @@ export class SqliteStore implements Store {
         samples: Number(r.samples),
         title: (r.title as string | null) ?? null,
         channelUrl: channelUrl(platform, channelId),
+      };
+    });
+  }
+
+  /**
+   * V코인 시세 — 최근 기간 평균 시청자를 "현재가"로, 직전 동일 기간 대비 등락률.
+   * recentHours 기간을 현재가, 그 이전 recentHours 기간을 직전가로 본다.
+   */
+  getCoinMarket(recentHours = 24): CoinItem[] {
+    const now = Date.now();
+    const recentCut = new Date(now - recentHours * 3_600_000).toISOString();
+    const prevCut = new Date(now - 2 * recentHours * 3_600_000).toISOString();
+
+    const latestGlobal = (
+      this.db
+        .prepare(`SELECT MAX(collected_at) AS m FROM live_snapshots`)
+        .get() as { m: string | null }
+    ).m;
+
+    const rows = this.db
+      .prepare(`
+        SELECT a.channel_id, a.platform, a.price, a.prev, a.last_at,
+          (SELECT channel_name FROM live_snapshots s
+           WHERE s.channel_id = a.channel_id ORDER BY s.collected_at DESC LIMIT 1) AS name
+        FROM (
+          SELECT channel_id, platform,
+            AVG(CASE WHEN collected_at >= ? THEN viewers END) AS price,
+            AVG(CASE WHEN collected_at < ? AND collected_at >= ? THEN viewers END) AS prev,
+            MAX(collected_at) AS last_at
+          FROM live_snapshots
+          WHERE collected_at >= ?
+          GROUP BY channel_id
+        ) a
+        WHERE a.price IS NOT NULL
+        ORDER BY a.price DESC
+      `)
+      .all(recentCut, recentCut, prevCut, prevCut) as unknown as Array<
+      Record<string, unknown>
+    >;
+
+    return rows.map((r) => {
+      const platform = r.platform as Platform;
+      const channelId = r.channel_id as string;
+      const price = Math.round(Number(r.price));
+      const prev = r.prev != null ? Math.round(Number(r.prev)) : null;
+      return {
+        channelId,
+        channelName: r.name as string,
+        platform,
+        channelUrl: channelUrl(platform, channelId),
+        price,
+        prevPrice: prev,
+        changePct: prev && prev > 0 ? (price - prev) / prev : null,
+        isLive: !!latestGlobal && r.last_at === latestGlobal,
       };
     });
   }

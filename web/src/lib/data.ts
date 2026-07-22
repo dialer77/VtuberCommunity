@@ -8,7 +8,7 @@ import type {
 import { RAW_LIVES, RAW_DEBUTS } from "@/lib/mock";
 import { loadIssues, loadIssue, issueSlugs } from "@/lib/issues";
 import { fetchChzzkLives } from "@/lib/chzzk";
-import type { TagCount, ChannelProfile } from "@/types";
+import type { TagCount, ChannelProfile, CoinItem, CoinSort } from "@/types";
 import {
   fetchLivesFromBackend,
   fetchDebutsFromBackend,
@@ -16,6 +16,7 @@ import {
   fetchRisingFromBackend,
   fetchTags,
   fetchChannelProfile,
+  fetchCoins,
 } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
@@ -44,6 +45,14 @@ export async function getLiveStreams(tag?: string): Promise<LiveStream[]> {
 export async function getTags(): Promise<TagCount[]> {
   try {
     return await fetchTags();
+  } catch {
+    return [];
+  }
+}
+
+export async function getCoins(sort: CoinSort = "cap"): Promise<CoinItem[]> {
+  try {
+    return await fetchCoins(sort, 50);
   } catch {
     return [];
   }

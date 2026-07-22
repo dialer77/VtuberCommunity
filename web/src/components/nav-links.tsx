@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/", label: "지금 방송중" },
-  { href: "/debut", label: "신규 데뷔" },
   { href: "/ranking", label: "랭킹" },
+  { href: "/coins", label: "V코인" },
+  { href: "/debut", label: "신규 데뷔" },
   { href: "/issue", label: "이슈" },
 ];
 

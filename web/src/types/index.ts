@@ -94,6 +94,20 @@ export interface RisingEntry {
   channelUrl: string;
 }
 
+/** V코인 시세 아이템 (시청자 기반 지수 + 등락률) */
+export interface CoinItem {
+  channelId: string;
+  channelName: string;
+  platform: Platform;
+  channelUrl: string;
+  price: number;
+  prevPrice: number | null;
+  changePct: number | null;
+  isLive: boolean;
+}
+
+export type CoinSort = "cap" | "gainers" | "losers";
+
 /** 한 번의 방송 세션 (시계열에서 파생) */
 export interface Broadcast {
   startedAt: string;
