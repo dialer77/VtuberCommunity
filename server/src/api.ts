@@ -1,5 +1,7 @@
 import Fastify from "fastify";
-import type { SqliteStore, LiveItem } from "./store/sqlite";
+import type { FastifyReply, FastifyRequest } from "fastify";
+import type { SqliteStore, LiveItem, UserInfo } from "./store/sqlite";
+import type { Platform } from "./domain";
 import {
   TAG_CATALOG,
   resolveChannelTags,
@@ -7,6 +9,17 @@ import {
   type TagDef,
 } from "./tags/catalog";
 import { curatedProfile } from "./profiles";
+import { config } from "./config";
+
+/** 유저 데이터 API 가드 — 공유 시크릿이 맞을 때만 통과 (우리 웹 서버만 호출) */
+function checkInternal(req: FastifyRequest, reply: FastifyReply): boolean {
+  const secret = (req.headers["x-internal-secret"] as string | undefined) ?? "";
+  if (!config.internalSecret || secret !== config.internalSecret) {
+    reply.code(401);
+    return false;
+  }
+  return true;
+}
 
 interface TagRef {
   id: string;
@@ -129,6 +142,55 @@ export function buildApi(store: SqliteStore) {
     const q = req.query as { window?: string; limit?: string };
     const rising = store.getRising(Number(q.window) || 60, Number(q.limit) || 10);
     return { count: rising.length, rising };
+  });
+
+  // ---- 유저 데이터 (공유 시크릿 보호, 우리 웹 서버만 호출) ----
+
+  // 로그인 시 유저 upsert
+  app.post("/api/user/upsert", async (req, reply) => {
+    if (!checkInternal(req, reply)) return { error: "unauthorized" };
+    const u = req.body as UserInfo;
+    if (!u?.id) {
+      reply.code(400);
+      return { error: "id required" };
+    }
+    store.upsertUser(u);
+    return { ok: true };
+  });
+
+  // 즐겨찾기 목록
+  app.get("/api/user/:userId/favorites", async (req, reply) => {
+    if (!checkInternal(req, reply)) return { error: "unauthorized" };
+    const { userId } = req.params as { userId: string };
+    return { favorites: store.getFavorites(userId) };
+  });
+
+  // 즐겨찾기 추가
+  app.post("/api/user/:userId/favorites", async (req, reply) => {
+    if (!checkInternal(req, reply)) return { error: "unauthorized" };
+    const { userId } = req.params as { userId: string };
+    const b = req.body as {
+      platform?: Platform;
+      channelId?: string;
+      channelName?: string;
+    };
+    if (!b?.platform || !b?.channelId) {
+      reply.code(400);
+      return { error: "platform, channelId required" };
+    }
+    store.addFavorite(userId, b.platform, b.channelId, b.channelName ?? null);
+    return { ok: true };
+  });
+
+  // 즐겨찾기 삭제
+  app.delete("/api/user/:userId/favorites/:channelId", async (req, reply) => {
+    if (!checkInternal(req, reply)) return { error: "unauthorized" };
+    const { userId, channelId } = req.params as {
+      userId: string;
+      channelId: string;
+    };
+    store.removeFavorite(userId, channelId);
+    return { ok: true };
   });
 
   return app;

@@ -19,4 +19,6 @@ export const config = {
   retentionDays: Number(process.env.RETENTION_DAYS ?? 7),
   /** Postgres 연결 문자열 (storeKind=postgres 일 때) */
   databaseUrl: process.env.DATABASE_URL ?? "",
+  /** 유저 데이터 API 보호용 공유 시크릿 (웹 서버 ↔ 백엔드). 비어있으면 유저 API 비활성 */
+  internalSecret: process.env.INTERNAL_SECRET ?? "",
 };

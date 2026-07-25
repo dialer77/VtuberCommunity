@@ -59,6 +59,25 @@ export interface ChannelProfile {
   broadcasts: Broadcast[];
 }
 
+/** 유저 정보 (구글 로그인) */
+export interface UserInfo {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  image?: string | null;
+}
+
+/** 즐겨찾기 아이템 (+ 현재 방송 상태) */
+export interface FavoriteItem {
+  channelId: string;
+  channelName: string;
+  platform: Platform;
+  channelUrl: string;
+  isLive: boolean;
+  viewers: number | null;
+  title: string | null;
+}
+
 /** V코인 시세 아이템 (시청자 기반 지수 + 등락률) */
 export interface CoinItem {
   channelId: string;
@@ -159,6 +178,24 @@ export class SqliteStore implements Store {
       );
       CREATE INDEX IF NOT EXISTS idx_snap_collected ON live_snapshots(collected_at);
       CREATE INDEX IF NOT EXISTS idx_snap_channel ON live_snapshots(channel_id, collected_at);
+
+      CREATE TABLE IF NOT EXISTS users (
+        id         TEXT PRIMARY KEY,
+        email      TEXT,
+        name       TEXT,
+        image      TEXT,
+        created_at TEXT NOT NULL,
+        last_login_at TEXT
+      );
+      CREATE TABLE IF NOT EXISTS favorites (
+        user_id      TEXT NOT NULL,
+        platform     TEXT NOT NULL,
+        channel_id   TEXT NOT NULL,
+        channel_name TEXT,
+        created_at   TEXT NOT NULL,
+        PRIMARY KEY (user_id, channel_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_fav_user ON favorites(user_id, created_at);
     `);
     // 기존 DB 마이그레이션(컬럼 추가). 이미 있으면 무시.
     this.safeAddColumn("channels", "first_title", "TEXT");
@@ -303,6 +340,81 @@ export class SqliteStore implements Store {
       rawTags: isLive ? parseTags(current!.tags) : parseTags(current?.tags),
       broadcasts,
     };
+  }
+
+  // ---- 유저 / 즐겨찾기 ----
+
+  /** 로그인 시 유저 upsert */
+  upsertUser(u: UserInfo): void {
+    const now = new Date().toISOString();
+    this.db
+      .prepare(`
+        INSERT INTO users (id, email, name, image, created_at, last_login_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          email = excluded.email, name = excluded.name,
+          image = excluded.image, last_login_at = excluded.last_login_at
+      `)
+      .run(u.id, u.email ?? null, u.name ?? null, u.image ?? null, now, now);
+  }
+
+  addFavorite(
+    userId: string,
+    platform: Platform,
+    channelId: string,
+    channelName: string | null,
+  ): void {
+    this.db
+      .prepare(`
+        INSERT OR IGNORE INTO favorites (user_id, platform, channel_id, channel_name, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `)
+      .run(userId, platform, channelId, channelName, new Date().toISOString());
+  }
+
+  removeFavorite(userId: string, channelId: string): void {
+    this.db
+      .prepare(`DELETE FROM favorites WHERE user_id = ? AND channel_id = ?`)
+      .run(userId, channelId);
+  }
+
+  /** 유저의 즐겨찾기 목록 (+ 현재 방송 상태) */
+  getFavorites(userId: string): FavoriteItem[] {
+    const latestGlobal = (
+      this.db
+        .prepare(`SELECT MAX(collected_at) AS m FROM live_snapshots`)
+        .get() as { m: string | null }
+    ).m;
+
+    const rows = this.db
+      .prepare(`
+        SELECT f.platform, f.channel_id, f.channel_name,
+          (SELECT viewers FROM live_snapshots s
+           WHERE s.channel_id = f.channel_id ORDER BY s.collected_at DESC LIMIT 1) AS viewers,
+          (SELECT title FROM live_snapshots s
+           WHERE s.channel_id = f.channel_id ORDER BY s.collected_at DESC LIMIT 1) AS title,
+          (SELECT MAX(collected_at) FROM live_snapshots s
+           WHERE s.channel_id = f.channel_id) AS last_at
+        FROM favorites f
+        WHERE f.user_id = ?
+        ORDER BY f.created_at DESC
+      `)
+      .all(userId) as unknown as Array<Record<string, unknown>>;
+
+    return rows.map((r) => {
+      const platform = r.platform as Platform;
+      const channelId = r.channel_id as string;
+      const isLive = !!latestGlobal && r.last_at === latestGlobal;
+      return {
+        channelId,
+        channelName: (r.channel_name as string | null) ?? channelId,
+        platform,
+        channelUrl: channelUrl(platform, channelId),
+        isLive,
+        viewers: isLive ? Number(r.viewers ?? 0) : null,
+        title: isLive ? ((r.title as string | null) ?? null) : null,
+      };
+    });
   }
 
   /** 보존 기간(일)을 넘긴 스냅샷 삭제. DB 무한 증가 방지. */
