@@ -39,8 +39,17 @@ export class SoopCollector implements Collector {
   readonly platform = "soop" as const;
 
   async fetchLives(): Promise<RawLive[]> {
+    // 실제 브라우저 요청처럼 보이게 헤더 보강 (해외/봇 트래픽 차단 우회 시도)
     const res = await fetch(SOOP_SEARCH_URL, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+        Accept: "application/json, text/javascript, */*; q=0.01",
+        "Accept-Language": "ko-KR,ko;q=0.9",
+        Referer: "https://www.sooplive.co.kr/",
+        Origin: "https://www.sooplive.co.kr",
+        "X-Requested-With": "XMLHttpRequest",
+      },
     });
     if (!res.ok) throw new Error(`SOOP API ${res.status}`);
 
