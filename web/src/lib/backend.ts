@@ -14,6 +14,12 @@ import type {
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
 const BASE = process.env.BACKEND_URL ?? "http://localhost:4000";
 
+// 실시간이라 캐시 안 함 + ngrok 무료 도메인의 브라우저 경고 인터스티셜 우회.
+const FETCH_INIT: RequestInit = {
+  cache: "no-store",
+  headers: { "ngrok-skip-browser-warning": "true" },
+};
+
 interface BackendLive {
   channelId: string;
   channelName: string;
@@ -43,7 +49,7 @@ export async function fetchLivesFromBackend(
   const url = tag
     ? `${BASE}/api/lives?tag=${encodeURIComponent(tag)}`
     : `${BASE}/api/lives`;
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, FETCH_INIT);
   if (!res.ok) throw new Error(`backend /api/lives ${res.status}`);
   const json = (await res.json()) as { lives?: BackendLive[] };
   return (json.lives ?? []).map((l) => ({
@@ -62,7 +68,7 @@ export async function fetchLivesFromBackend(
 }
 
 export async function fetchTags(): Promise<TagCount[]> {
-  const res = await fetch(`${BASE}/api/tags`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/api/tags`, FETCH_INIT);
   if (!res.ok) throw new Error(`backend /api/tags ${res.status}`);
   const json = (await res.json()) as { tags?: TagCount[] };
   return json.tags ?? [];
@@ -72,9 +78,7 @@ export async function fetchCoins(
   sort: CoinSort = "cap",
   limit = 50,
 ): Promise<CoinItem[]> {
-  const res = await fetch(`${BASE}/api/coins?sort=${sort}&limit=${limit}`, {
-    cache: "no-store",
-  });
+  const res = await fetch(`${BASE}/api/coins?sort=${sort}&limit=${limit}`, FETCH_INIT);
   if (!res.ok) throw new Error(`backend /api/coins ${res.status}`);
   const json = (await res.json()) as { coins?: CoinItem[] };
   return json.coins ?? [];
@@ -86,7 +90,7 @@ export async function fetchChannelProfile(
 ): Promise<ChannelProfile | null> {
   const res = await fetch(
     `${BASE}/api/channels/${encodeURIComponent(platform)}/${encodeURIComponent(channelId)}`,
-    { cache: "no-store" },
+    FETCH_INIT,
   );
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`backend /api/channels ${res.status}`);
@@ -94,7 +98,7 @@ export async function fetchChannelProfile(
 }
 
 export async function fetchDebutsFromBackend(): Promise<DebutEvent[]> {
-  const res = await fetch(`${BASE}/api/debuts`, { cache: "no-store" });
+  const res = await fetch(`${BASE}/api/debuts`, FETCH_INIT);
   if (!res.ok) throw new Error(`backend /api/debuts ${res.status}`);
   const json = (await res.json()) as { debuts?: BackendDebut[] };
   return (json.debuts ?? []).map((d) => ({
@@ -115,7 +119,7 @@ export async function fetchRankingFromBackend(
 ): Promise<RankingEntry[]> {
   const res = await fetch(
     `${BASE}/api/ranking?window=${windowMinutes}&limit=${limit}`,
-    { cache: "no-store" },
+    FETCH_INIT,
   );
   if (!res.ok) throw new Error(`backend /api/ranking ${res.status}`);
   const json = (await res.json()) as { ranking?: RankingEntry[] };
@@ -128,7 +132,7 @@ export async function fetchRisingFromBackend(
 ): Promise<RisingEntry[]> {
   const res = await fetch(
     `${BASE}/api/rising?window=${windowMinutes}&limit=${limit}`,
-    { cache: "no-store" },
+    FETCH_INIT,
   );
   if (!res.ok) throw new Error(`backend /api/rising ${res.status}`);
   const json = (await res.json()) as { rising?: RisingEntry[] };
