@@ -1,0 +1,36 @@
+# VMOA 백엔드 Fly.io 설정
+# app 이름은 전역 고유해야 함 — 이미 있으면 fly launch 때 다른 이름으로.
+app = "vmoa-server"
+primary_region = "nrt"  # 도쿄 (한국에서 가장 가까움 — SOOP/치지직 지연·차단에 유리)
+
+[build]
+
+[env]
+  PORT = "8080"
+  DB_PATH = "/data/vmoa.db"
+  # INTERNAL_SECRET 는 코드에 두지 말고 `fly secrets set` 으로 주입
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # 24/7 폴링이 멈추면 안 되므로 자동 정지 끔 (항상 1대 유지)
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "15s"
+    method = "GET"
+    path = "/health"
+
+# SQLite 영구 저장 볼륨 (유저 데이터·시계열 보존)
+[[mounts]]
+  source = "vmoa_data"
+  destination = "/data"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"
