@@ -14,10 +14,9 @@ import type {
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
 const BASE = process.env.BACKEND_URL ?? "http://localhost:4000";
 
-// 실시간이라 캐시 안 함 + ngrok 무료 도메인의 브라우저 경고 인터스티셜 우회.
+// 실시간이라 캐시 안 함.
 const FETCH_INIT: RequestInit = {
   cache: "no-store",
-  headers: { "ngrok-skip-browser-warning": "true" },
 };
 
 interface BackendLive {
