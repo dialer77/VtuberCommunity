@@ -1,5 +1,7 @@
 # 백엔드 Railway 배포 가이드
 
+> **현재 운영 방식은 [Windows PC + Cloudflare Tunnel](./deploy-windows-tunnel.md)** 이다. 이 문서는 대안 참고용.
+
 > 목적: `server/`(수집기 + SQLite + API)를 Railway에 상주 배포 → 주소 고정,
 > PC 불필요, 자동 재시작. 이후 Vercel `BACKEND_URL`을 한 번만 설정하면 끝.
 

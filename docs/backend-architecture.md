@@ -145,6 +145,7 @@ npm run dev
 
 ## 9. 배포 관점 (참고)
 
+- **현재 운영: [Windows PC + Cloudflare Tunnel](./deploy-windows-tunnel.md)** — 국내 IP 수집(SOOP 차단 회피), GitHub push 시 자동 업데이트.
 - 백엔드는 **상주 프로세스**라 서버리스 부적합 → VPS/컨테이너에서 상시 실행.
 - 폴링 간격은 대상 채널 수·rate limit 보며 60~300초 조정.
 - API 키·`DATABASE_URL`·자체 DB 파일은 `.env`/`data/`로 두고 **커밋 금지**(`.gitignore` 반영됨).

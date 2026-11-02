@@ -1,5 +1,7 @@
 # 백엔드 Fly.io 배포 가이드
 
+> **현재 운영 방식은 [Windows PC + Cloudflare Tunnel](./deploy-windows-tunnel.md)** 이다. 이 문서는 대안 참고용.
+
 > `server/`(수집기 + SQLite + API)를 Fly.io에 상주 배포. 도쿄 리전, 24/7 유지,
 > SQLite는 볼륨에 영구 저장. 소규모라 월 ~$2 수준(종량제, 카드 필요).
 
