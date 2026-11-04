@@ -1,7 +1,7 @@
 # 백엔드 배포 — Windows PC + Cloudflare Tunnel
 
 > `server/`(수집기 + SQLite + API)를 **사무실/집의 Windows PC**에서 상시 실행하고,
-> Cloudflare Tunnel 로 `https://api.<도메인>` 에 공개한다. 웹(`web/`)은 Vercel 그대로.
+> Cloudflare Tunnel 로 `https://api.vmoa.live` 에 공개한다. 웹(`web/`)은 Vercel 그대로.
 > 개발 PC 와 배포 PC 가 떨어져 있어도 **GitHub push 만 하면 배포 PC 가 알아서 업데이트**한다.
 
 ## 왜 이 방식인가
@@ -22,7 +22,7 @@
                                     ▼                              ├ server (node) :4000
                               Vercel 자동 배포 (web)                └ 새 커밋 → pull → 재시작
                                     │                          cloudflared (Windows 서비스)
-                                    └── BACKEND_URL ──▶ https://api.<도메인> ─┘
+                                    └── BACKEND_URL ──▶ https://api.vmoa.live ─┘
 ```
 
 - 배포 PC 는 **나가는 연결만** 쓴다 (GitHub pull, Cloudflare 터널). 포트포워딩·공인 IP 불필요.
@@ -50,16 +50,28 @@
 
 ---
 
-## 1. Cloudflare — 터널 만들기 (브라우저, 아무 PC 에서)
+## 1. Cloudflare — 터널 (✅ 2026-11-04 개발 PC 에서 생성 완료)
 
-1. [Cloudflare 대시보드](https://dash.cloudflare.com) → **Zero Trust** → **Networks → Tunnels** → **Create a tunnel**
-2. 유형 **Cloudflared** → 이름 `vmoa` → 환경 **Windows** 선택
-3. 화면에 나오는 설치 명령 `cloudflared.exe service install eyJhIjoi...` 에서 **`eyJ...` 토큰 부분만 복사**해 둔다
-   (명령 자체는 실행하지 않아도 됨 — setup 이 대신 실행)
-4. 다음 단계 **Public Hostname** (UI 버전에 따라 *Published application routes*):
-   - Subdomain: `api` · Domain: 우리 도메인
-   - Service: **HTTP** · URL: `localhost:4000`
-5. 저장. (터널이 연결되기 전까지 상태는 *Inactive* 로 보임 — 정상)
+개발 PC 에서 **브라우저 로그인 한 번 + CLI** 로 만들어 둔 상태. 다시 할 필요 없음.
+
+| 항목 | 값 |
+|---|---|
+| 터널 | `vmoa` (`9ee8f731-a661-4a59-82e7-07c9c7f6242a`, CLI 생성 = 설정은 로컬 config.yml) |
+| DNS | `api.vmoa.live` CNAME → `<터널ID>.cfargotunnel.com` (Proxied) |
+| 인증 파일 | 개발 PC `server\data\seed\vmoa-tunnel.json` (git 제외 — **비밀번호처럼 취급**) |
+| 관리 도구 | 개발 PC `tools\cloudflared.exe` + 로그인 인증서 `$env:USERPROFILE\.cloudflared\cert.pem` |
+
+처음부터 다시 만들 때 (개발 PC, 저장소 루트):
+
+```powershell
+tools\cloudflared.exe tunnel login                       # 브라우저 → vmoa.live 선택 → Authorize
+tools\cloudflared.exe tunnel create vmoa                 # $env:USERPROFILE\.cloudflared\<ID>.json 생성
+tools\cloudflared.exe tunnel route dns vmoa api.vmoa.live
+Copy-Item "$env:USERPROFILE\.cloudflared\<ID>.json" server\data\seed\vmoa-tunnel.json
+```
+
+> ⚠️ 같은 터널을 **두 PC 에서 동시에 실행하지 말 것** — 트래픽이 양쪽으로 나뉘어, 서버가 없는 쪽으로 간 요청은 502 가 된다.
+> (개발 PC 에서 테스트로 `tunnel run` 했다면 반드시 끄기)
 
 ## 2. 배포 PC — 설치 (원격 데스크톱 접속 후)
 
@@ -74,38 +86,58 @@ git clone https://github.com/dialer77/VtuberCommunity.git C:\vmoa
 cd C:\vmoa
 ```
 
-**시드 DB** (기존 채널 목록 4천여 개 — 이게 없으면 처음 보는 채널이 전부 "신규 데뷔"로 잡힘):
-개발 PC 의 `server\data\seed\vmoa-seed.db` 를 원격 데스크톱 창으로 **복사 → 배포 PC 바탕화면에 붙여넣기**.
+**파일 2개 옮기기** — 개발 PC 의 `server\data\seed\` 에서 원격 데스크톱 창으로 **복사 → 배포 PC 바탕화면에 붙여넣기**:
+
+| 파일 | 용도 |
+|---|---|
+| `vmoa-seed.db` | 기존 채널 목록 4천여 개 — 없으면 처음 보는 채널이 전부 "신규 데뷔"로 잡힘 |
+| `vmoa-tunnel.json` | 터널 인증 — setup 이 `C:\ProgramData\vmoa\cloudflared\` 로 옮기고 권한을 잠근다 |
 
 설치 실행:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\windows\setup.ps1 `
-  -TunnelToken "eyJ...(1-3에서 복사한 토큰)" `
-  -PublicHost "api.<도메인>" `
-  -SeedDb "$env:USERPROFILE\Desktop\vmoa-seed.db"
+  -SeedDb "$env:USERPROFILE\Desktop\vmoa-seed.db" `
+  -TunnelCredFile "$env:USERPROFILE\Desktop\vmoa-tunnel.json"
 ```
 
+설치가 끝나면 바탕화면의 두 파일은 지워도 된다 (특히 `vmoa-tunnel.json`).
+
 setup 이 하는 일: Node 24+ 확인(없으면 winget 설치) → `server\.env` 생성(`INTERNAL_SECRET` 자동 생성)
-→ 시드 DB 복사 → `npm ci` → 절전 끔 → 작업 스케줄러 등록·시작 → cloudflared 설치·터널 서비스 등록 → 헬스체크.
+→ 시드 DB 복사 → `npm ci` → 절전 끔 → 작업 스케줄러 등록·시작 → cloudflared 설치·터널 서비스 등록 → 헬스체크 (로컬 + `https://api.vmoa.live`).
 
 마지막에 출력되는 **`INTERNAL_SECRET`** 값을 복사해 둔다 (3단계에서 사용).
 
-## 3. Vercel — 백엔드 주소 연결 (한 번만)
+## 3. Vercel — 웹 도메인 + 백엔드 주소 연결 (한 번만)
 
-Vercel → 프로젝트 → **Settings → Environment Variables**:
+**도메인 연결** — Vercel → 프로젝트 → **Settings → Domains** → `vmoa.live` 추가 (www 리다이렉트 제안은 수락).
+Vercel 이 보여주는 DNS 레코드를 Cloudflare → `vmoa.live` → **DNS → Records** 에 그대로 추가:
+
+| 이름 | 종류 / 값 | 프록시 |
+|---|---|---|
+| `vmoa.live` (`@`) | Vercel 화면에 나온 A 레코드 | **DNS only (회색 구름)** |
+| `www` | Vercel 화면에 나온 CNAME | **DNS only (회색 구름)** |
+| `api` | 터널이 자동 생성 — 건드리지 말 것 | Proxied (주황 구름) |
+
+- Vercel 레코드를 주황 구름(Proxied)으로 두면 인증서 발급·캐시가 꼬일 수 있으므로 **반드시 회색**.
+- Vercel Domains 화면에 `Valid Configuration` 이 뜨면 완료 (HTTPS 인증서 자동 발급, 수 분).
+
+**환경변수** — **Settings → Environment Variables** (Production):
 
 | Key | Value |
 |---|---|
-| `BACKEND_URL` | `https://api.<도메인>` |
+| `BACKEND_URL` | `https://api.vmoa.live` |
+| `SITE_URL` | `https://vmoa.live` (sitemap·robots·OG·canonical 에 사용) |
 | `INTERNAL_SECRET` | setup 출력값 (계정/즐겨찾기 기능용 — 지금 넣어둬도 무방) |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | (선택) `contact@vmoa.live` — Cloudflare **Email Routing** 으로 개인 메일에 전달 가능 |
 
 저장 → **Deployments → Redeploy**.
 
 ## 4. 확인
 
-- 브라우저: `https://api.<도메인>/health` → `{"ok":true,...}`
-- 브라우저: `https://api.<도메인>/api/lives` → 치지직·SOOP 라이브 목록
+- 브라우저: `https://vmoa.live` → 사이트 (www.vmoa.live 는 자동으로 vmoa.live 로 이동)
+- 브라우저: `https://api.vmoa.live/health` → `{"ok":true,...}`
+- 브라우저: `https://api.vmoa.live/api/lives` → 치지직·SOOP 라이브 목록
 - 배포 PC: `powershell -ExecutionPolicy Bypass -File deploy\windows\status.ps1`
 - 웹 사이트에서 **SOOP 방송이 보이는지** 확인 — 웹은 백엔드가 안 되면 치지직 직접 조회로 폴백하므로,
   치지직만 보이면 백엔드 연결이 안 된 것.
@@ -133,14 +165,14 @@ Vercel → 프로젝트 → **Settings → Environment Variables**:
   막히면 `supervisor.log` 에 "pull 실패" 가 남음 → `git status` 로 확인 후 `git checkout -- .` 로 되돌리기.
 - Windows 업데이트 재부팅은 괜찮다 — 작업 스케줄러가 **로그인 없이** 부팅 시 자동 시작.
   다만 재부팅 동안은 수집이 끊기므로 *설정 → 업데이트 → 사용 시간* 을 운영 시간 밖으로 잡아둘 것.
-- 터널 토큰은 비밀번호와 같다. 노출되면 Cloudflare 대시보드에서 터널 토큰을 재발급.
+- 터널 인증 파일(`vmoa-tunnel.json`)은 비밀번호와 같다. 노출되면 개발 PC 에서 터널을 지우고(`tools\cloudflared.exe tunnel delete -f vmoa`) 1장 절차로 다시 만든 뒤 setup 재실행.
 
 ## 문제 해결
 
 | 증상 | 확인 / 조치 |
 |---|---|
 | `status.ps1` 에서 서버 "실행 중 아님" | `supervisor.log` · `server-*.err.log` 확인 → 원인 수정 후 `restart.ps1` |
-| 로컬 OK, `https://api.<도메인>` FAIL | cloudflared 서비스 상태 (`Get-Service cloudflared`), 대시보드 터널 *Healthy* 여부, Public Hostname 의 URL 이 `localhost:4000` 인지 |
+| 로컬 OK, `https://api.vmoa.live` FAIL | 배포 PC: `Get-Service cloudflared` 가 Running 인지, `C:\ProgramData\vmoa\cloudflared\config.yml` 의 포트. 개발 PC: `tools\cloudflared.exe tunnel info vmoa` 로 연결(CONNECTIONS) 확인 |
 | 브라우저에선 API OK, 웹에는 치지직만 보임 | Vercel `BACKEND_URL` 오타/Redeploy 누락. 또는 Cloudflare **Security → Bots → Bot Fight Mode** 가 Vercel 서버의 요청을 막는 경우 — Security Events 에서 차단 기록 확인, 있으면 Bot Fight Mode 끄기 (Free 플랜은 호스트별 예외 불가) |
 | 사내망에서 터널이 안 붙음 | 방화벽이 cloudflared 의 아웃바운드 7844 포트(QUIC/TCP)를 막는지 IT 확인 |
 | 업데이트가 반영 안 됨 | `supervisor.log` 의 `git fetch 실패` / `pull 실패` 확인 |

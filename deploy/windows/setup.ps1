@@ -4,7 +4,12 @@
 
     cd C:\vmoa
     powershell -ExecutionPolicy Bypass -File deploy\windows\setup.ps1 `
-      -TunnelToken "<Cloudflare 터널 토큰>" -PublicHost "api.example.com" -SeedDb "C:\Users\me\Desktop\vmoa-seed.db"
+      -SeedDb "$env:USERPROFILE\Desktop\vmoa-seed.db" -TunnelCredFile "$env:USERPROFILE\Desktop\vmoa-tunnel.json"
+    (-PublicHost 기본값은 api.vmoa.live — 다른 주소를 쓸 때만 지정)
+
+  터널 지정 방식 (둘 중 하나)
+    -TunnelCredFile : 개발 PC 에서 `cloudflared tunnel create` 로 만든 터널의 인증 JSON (현재 방식)
+    -TunnelToken    : 대시보드에서 만든 터널의 토큰 (대안)
 
   하는 일 (다시 실행해도 안전 — 이미 된 단계는 유지)
     1. Node.js(24+) / Git 확인 (없으면 winget 으로 설치)
@@ -13,11 +18,12 @@
     4. npm ci (server 의존성)
     5. 절전/최대절전 끔 (전원 연결 시)
     6. 작업 스케줄러 'VMOA-Server' 등록 → 부팅 시 자동 시작, SYSTEM 계정 (로그인 불필요)
-    7. cloudflared 설치 + 터널 서비스 등록 (-TunnelToken 지정 시)
+    7. cloudflared 설치 + 터널 서비스 등록 (-TunnelCredFile 또는 -TunnelToken 지정 시)
 #>
 param(
+  [string]$TunnelCredFile = '',
   [string]$TunnelToken = '',
-  [string]$PublicHost = '',
+  [string]$PublicHost = 'api.vmoa.live',
   [string]$SeedDb = '',
   [int]$Port = 4000,
   [string]$Branch = 'main',
@@ -56,7 +62,9 @@ function Find-Cloudflared {
   return ''
 }
 
-$needAdmin = (-not $NoService) -or (-not $SkipPowerConfig) -or [bool]$TunnelToken
+$needAdmin = (-not $NoService) -or (-not $SkipPowerConfig) -or [bool]$TunnelToken -or [bool]$TunnelCredFile
+if ($TunnelCredFile -and $TunnelToken) { Fail '-TunnelCredFile 와 -TunnelToken 중 하나만 지정하세요.' }
+if ($TunnelCredFile -and -not (Test-Path $TunnelCredFile)) { Fail ('터널 인증 파일이 없습니다: {0}' -f $TunnelCredFile) }
 if ($needAdmin -and -not (Test-IsAdmin)) {
   Fail '관리자 권한이 필요합니다. 시작 메뉴에서 PowerShell 을 우클릭 → "관리자 권한으로 실행" 후 다시 실행하세요.'
 }
@@ -179,7 +187,7 @@ if (-not $NoService) {
 }
 
 # ------------------------------------------------------------------ 7. Cloudflare 터널
-if ($TunnelToken) {
+if ($TunnelToken -or $TunnelCredFile) {
   Step 'Cloudflare 터널 (cloudflared)'
   $cf = Find-Cloudflared
   if (-not $cf -and (Find-Exe 'winget.exe')) {
@@ -197,7 +205,48 @@ if ($TunnelToken) {
   if (-not $cf) { Fail 'cloudflared 를 설치하지 못했습니다.' }
   Ok ('cloudflared: {0}' -f $cf)
 
-  if (Get-Service -Name 'cloudflared' -ErrorAction SilentlyContinue) {
+  if ($TunnelCredFile) {
+    # 인증 JSON 방식: 설정·인증 파일을 ProgramData 에 두고, 서비스가 그 설정으로 실행되게 한다.
+    $cred = Get-Content $TunnelCredFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    $tunnelId = [string]$cred.TunnelID
+    if (-not $tunnelId) { Fail ('터널 인증 파일 형식이 아닙니다 (TunnelID 없음): {0}' -f $TunnelCredFile) }
+    $cfDir = Join-Path $env:ProgramData 'vmoa\cloudflared'
+    New-Item -ItemType Directory -Force $cfDir | Out-Null
+    $credDst = Join-Path $cfDir ('{0}.json' -f $tunnelId)
+    Copy-Item $TunnelCredFile $credDst -Force
+    $cfgPath = Join-Path $cfDir 'config.yml'
+    $cfg = @(
+      ('tunnel: {0}' -f $tunnelId),
+      ('credentials-file: {0}' -f $credDst),
+      'ingress:',
+      ('  - hostname: {0}' -f $conf.PublicHost),
+      ('    service: http://localhost:{0}' -f $Port),
+      '  - service: http_status:404'
+    ) -join "`r`n"
+    Write-Utf8NoBom $cfgPath ($cfg + "`r`n")
+    # 인증 파일은 SYSTEM·Administrators 만 읽도록 (상속 제거)
+    & icacls $cfDir /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' | Out-Null
+    Ok ('터널 {0} 설정 -> {1}' -f $tunnelId.Substring(0, 8), $cfgPath)
+
+    $svc = Get-Service -Name 'cloudflared' -ErrorAction SilentlyContinue
+    if (-not $svc) {
+      $r = Invoke-Native $cf @('service', 'install')
+      $svc = Get-Service -Name 'cloudflared' -ErrorAction SilentlyContinue
+      if (-not $svc) {
+        Warn ('cloudflared service install 실패 — 서비스 직접 생성: {0}' -f ($r.Output -join ' | '))
+        New-Service -Name 'Cloudflared' -DisplayName 'Cloudflared agent' -StartupType Automatic `
+          -BinaryPathName ('"{0}"' -f $cf) | Out-Null
+      }
+    }
+    # 서비스 실행 명령을 우리 설정 파일로 고정 + 비정상 종료 시 자동 재시작
+    Stop-Service -Name 'cloudflared' -Force -ErrorAction SilentlyContinue
+    Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Cloudflared' -Name ImagePath `
+      -Value ('"{0}" --config "{1}" tunnel run' -f $cf, $cfgPath)
+    Set-Service -Name 'cloudflared' -StartupType Automatic
+    & sc.exe failure Cloudflared reset= 86400 actions= restart/10000/restart/10000/restart/60000 | Out-Null
+    Start-Service -Name 'cloudflared'
+    Ok '터널 서비스 등록 + 시작 (부팅 시 자동 실행)'
+  } elseif (Get-Service -Name 'cloudflared' -ErrorAction SilentlyContinue) {
     Warn '터널 서비스가 이미 설치돼 있어 건너뜀. 토큰을 바꾸려면: cloudflared service uninstall → setup 재실행'
   } else {
     $r = Invoke-Native $cf @('service', 'install', $TunnelToken)
@@ -219,6 +268,19 @@ if (-not $NoService) {
   }
   if ($healthy) { Ok ('http://localhost:{0}/health 응답 OK' -f $Port) }
   else { Warn '아직 응답이 없습니다. 잠시 후 status.ps1 로 로그를 확인하세요.' }
+
+  if (($TunnelCredFile -or $TunnelToken) -and $conf.PublicHost) {
+    $pubOk = $false
+    for ($i = 0; $i -lt 15; $i++) {
+      Start-Sleep -Seconds 2
+      try {
+        $h = Invoke-RestMethod ('https://{0}/health' -f $conf.PublicHost) -TimeoutSec 5
+        if ($h.ok) { $pubOk = $true; break }
+      } catch { }
+    }
+    if ($pubOk) { Ok ('https://{0}/health 응답 OK (터널 연결됨)' -f $conf.PublicHost) }
+    else { Warn ('https://{0}/health 아직 응답 없음 — 서비스 상태: Get-Service cloudflared' -f $conf.PublicHost) }
+  }
 }
 
 $pubHost = $conf.PublicHost

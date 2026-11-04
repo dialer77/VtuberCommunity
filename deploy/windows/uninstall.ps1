@@ -24,5 +24,7 @@ if ($RemoveTunnel) {
     }
   }
   if ($cf) { & $cf service uninstall; Write-Host '터널 서비스 제거' } else { Write-Host 'cloudflared 를 찾지 못함' }
+  $cfDir = Join-Path $env:ProgramData 'vmoa\cloudflared'
+  if (Test-Path $cfDir) { Remove-Item $cfDir -Recurse -Force; Write-Host ('터널 설정·인증 파일 삭제: {0}' -f $cfDir) }
 }
 Write-Host ('남겨둔 것: {0} (DB·로그), {1}' -f $DataDir, $EnvFile)
