@@ -143,6 +143,10 @@ npm run dev
 | Postgres 전환 | 트래픽 증가 시 `store/postgres.ts` 구현 |
 | 도메인 타입 공유 | `web`·`server`의 타입/버튜버 판정을 `packages/`로 추출 |
 
+## 8-1. 이슈 자동 수집
+
+3시간마다 Claude Code(구독 인증, 헤드리스)로 웹 검색 → 출처 포함 이슈 정리 → `issues`·`issue_sources` 테이블. `/api/issues`, `/api/issues/:slug`. 자세한 내용: [issue-collector.md](./issue-collector.md)
+
 ## 9. 배포 관점 (참고)
 
 - **현재 운영: [Windows PC + Cloudflare Tunnel](./deploy-windows-tunnel.md)** — 국내 IP 수집(SOOP 차단 회피), GitHub push 시 자동 업데이트.

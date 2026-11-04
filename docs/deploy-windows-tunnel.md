@@ -38,6 +38,8 @@
 | `status.ps1` | 상태 확인 (프로세스·헬스체크·터널·버전·로그) |
 | `restart.ps1` | 서버 재시작 (`-Full`: 감독까지) |
 | `uninstall.ps1` | 제거 (DB·`.env` 는 남김, `-RemoveTunnel`: 터널 서비스도) |
+| `setup-issues.ps1` | 이슈 자동 수집 켜기 (Claude 구독 토큰) — [issue-collector.md](./issue-collector.md) |
+| `issues.ps1` | 이슈 관리 (status / list / hide / show / run) |
 
 자동 업데이트 규칙 (`run-server.ps1`):
 

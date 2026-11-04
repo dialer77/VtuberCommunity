@@ -38,6 +38,24 @@ function Get-EnvValue([string]$Name, [string]$Default = '') {
   return $Default
 }
 
+# .env 에 값 쓰기 (있으면 교체, 없으면 추가). UTF-8(BOM 없음) — node --env-file 이 읽을 수 있게.
+function Set-EnvValue([string]$Name, [string]$Value) {
+  $lines = @()
+  if (Test-Path $EnvFile) { $lines = @(Get-Content $EnvFile -Encoding UTF8) }
+  $found = $false
+  $out = New-Object System.Collections.Generic.List[string]
+  foreach ($l in $lines) {
+    if ($l -match ('^\s*' + [regex]::Escape($Name) + '\s*=')) {
+      if (-not $found) { $out.Add("$Name=$Value") }
+      $found = $true
+    } else {
+      $out.Add($l)
+    }
+  }
+  if (-not $found) { $out.Add("$Name=$Value") }
+  Write-Utf8NoBom $EnvFile (($out -join "`r`n").TrimEnd() + "`r`n")
+}
+
 function Get-ServerPort {
   return [int](Get-EnvValue 'PORT' (Get-EnvValue 'API_PORT' '4000'))
 }
