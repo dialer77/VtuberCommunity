@@ -51,6 +51,12 @@ function enrich(item: LiveItem): LiveWithTags {
 export function buildApi(store: SqliteStore) {
   const app = Fastify({ logger: false });
 
+  // api.vmoa.live 는 웹이 쓰는 JSON API — 검색 결과에 노출되지 않게 (Search Console 도메인 속성에 포함되므로)
+  app.addHook("onSend", async (_req, reply, payload) => {
+    reply.header("X-Robots-Tag", "noindex, nofollow");
+    return payload;
+  });
+
   app.get("/health", async () => ({ ok: true, ts: new Date().toISOString() }));
 
   // 현재 방송중 (+ VMOA 태그). ?tag=<id> 로 필터.
@@ -98,10 +104,29 @@ export function buildApi(store: SqliteStore) {
     };
   });
 
-  // 최근 감지된 신규 채널(데뷔 후보)
-  app.get("/api/debuts", async () => {
-    const debuts = store.getRecentDebuts(20);
+  // 최근 감지된 신규 채널(데뷔 후보). ?days=90&limit=300 으로 기간 지정
+  app.get("/api/debuts", async (req) => {
+    const q = req.query as { days?: string; limit?: string };
+    const limit = Math.min(500, Number(q.limit) || 20);
+    const debuts = store.getRecentDebuts(limit, Number(q.days) || undefined);
     return { count: debuts.length, debuts };
+  });
+
+  // 이슈 타임라인 (공개된 것만, 최신순)
+  app.get("/api/issues", async (req) => {
+    const q = req.query as { limit?: string };
+    const issues = store.listIssues(Math.min(200, Number(q.limit) || 50));
+    return { count: issues.length, issues };
+  });
+
+  app.get("/api/issues/:slug", async (req, reply) => {
+    const { slug } = req.params as { slug: string };
+    const issue = store.getIssue(slug);
+    if (!issue) {
+      reply.code(404);
+      return { error: "not_found" };
+    }
+    return issue;
   });
 
   // 시청자 랭킹 (윈도우 내 평균)

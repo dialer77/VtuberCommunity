@@ -6,6 +6,7 @@ import { MemoryStore } from "./store/memory";
 import { PostgresStore } from "./store/postgres";
 import type { Store } from "./store/types";
 import { log } from "./log";
+import { startIssueScheduler } from "./issues/scheduler";
 
 function makeStore(): Store {
   switch (config.storeKind) {
@@ -25,8 +26,10 @@ if (store instanceof SqliteStore) {
   const app = buildApi(store);
   await app.listen({ port: config.apiPort, host: "0.0.0.0" });
   log.info(
-    `API http://localhost:${config.apiPort}  (/health, /api/lives, /api/debuts)`,
+    `API http://localhost:${config.apiPort}  (/health, /api/lives, /api/debuts, /api/issues)`,
   );
+  // 이슈 자동 수집 (ISSUES_ENABLED=1 일 때만)
+  startIssueScheduler(store);
 }
 
 // 수집 스케줄러

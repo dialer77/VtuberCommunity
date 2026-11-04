@@ -118,6 +118,39 @@ export interface RisingItem {
   channelUrl: string;
 }
 
+/** 이슈 출처 (기사·영상 등) + 미리보기 메타데이터 */
+export interface IssueSource {
+  url: string;
+  title: string;
+  publisher: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  publishedAt: string | null;
+  /** link = 일반 링크(미리보기 카드), youtube = 영상 임베드 */
+  kind: "link" | "youtube";
+  embedId: string | null;
+}
+
+/** 이슈 (자동 수집 또는 수동 작성) */
+export interface IssueItem {
+  slug: string;
+  title: string;
+  summary: string;
+  body: string;
+  tags: string[];
+  vtubers: string[];
+  /** 사건이 일어난 날 (YYYY-MM-DD) */
+  eventDate: string | null;
+  publishedAt: string;
+  status: "published" | "hidden";
+  origin: "auto" | "manual";
+  sources: IssueSource[];
+}
+
+export type NewIssue = Omit<IssueItem, "slug" | "publishedAt" | "status"> & {
+  slug: string;
+};
+
 function parseTags(raw: unknown): string[] {
   if (typeof raw !== "string" || !raw) return [];
   try {
@@ -196,6 +229,41 @@ export class SqliteStore implements Store {
         PRIMARY KEY (user_id, channel_id)
       );
       CREATE INDEX IF NOT EXISTS idx_fav_user ON favorites(user_id, created_at);
+
+      CREATE TABLE IF NOT EXISTS issues (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug         TEXT NOT NULL UNIQUE,
+        title        TEXT NOT NULL,
+        summary      TEXT NOT NULL,
+        body         TEXT NOT NULL,
+        tags         TEXT,
+        vtubers      TEXT,
+        event_date   TEXT,
+        published_at TEXT NOT NULL,
+        status       TEXT NOT NULL DEFAULT 'published',
+        origin       TEXT NOT NULL DEFAULT 'auto'
+      );
+      CREATE INDEX IF NOT EXISTS idx_issues_pub ON issues(status, published_at);
+      CREATE TABLE IF NOT EXISTS issue_sources (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        issue_id     INTEGER NOT NULL,
+        position     INTEGER NOT NULL DEFAULT 0,
+        url          TEXT NOT NULL,
+        title        TEXT,
+        publisher    TEXT,
+        description  TEXT,
+        image_url    TEXT,
+        published_at TEXT,
+        kind         TEXT NOT NULL DEFAULT 'link',
+        embed_id     TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_issue_sources_issue ON issue_sources(issue_id, position);
+      CREATE INDEX IF NOT EXISTS idx_issue_sources_url ON issue_sources(url);
+
+      CREATE TABLE IF NOT EXISTS app_meta (
+        key   TEXT PRIMARY KEY,
+        value TEXT
+      );
     `);
     // 기존 DB 마이그레이션(컬럼 추가). 이미 있으면 무시.
     this.safeAddColumn("channels", "first_title", "TEXT");
@@ -458,18 +526,23 @@ export class SqliteStore implements Store {
     });
   }
 
-  /** 최근 처음 감지된 채널(데뷔 후보) */
-  getRecentDebuts(limit = 20): DebutItem[] {
+  /** 최근 처음 감지된 채널(데뷔 후보). sinceDays 를 주면 그 기간 안에 처음 감지된 채널만. */
+  getRecentDebuts(limit = 20, sinceDays?: number): DebutItem[] {
+    const since =
+      sinceDays && sinceDays > 0
+        ? new Date(Date.now() - sinceDays * 86_400_000).toISOString()
+        : "";
     const rows = this.db
       .prepare(`
         SELECT c.channel_id, c.platform, c.name, c.first_seen_at, c.debut_signal,
           (SELECT title FROM live_snapshots s
            WHERE s.channel_id = c.channel_id ORDER BY s.collected_at DESC LIMIT 1) AS title
         FROM channels c
+        WHERE c.first_seen_at >= ?
         ORDER BY c.debut_signal DESC, c.first_seen_at DESC
         LIMIT ?
       `)
-      .all(limit) as unknown as Array<Record<string, unknown>>;
+      .all(since, limit) as unknown as Array<Record<string, unknown>>;
 
     return rows.map((r) => {
       const platform = r.platform as Platform;
@@ -611,5 +684,146 @@ export class SqliteStore implements Store {
       .sort((a, b) => b.growthPct - a.growthPct)
       .slice(0, limit)
       .map(({ samples: _samples, ...rest }) => rest);
+  }
+
+  // ---------------------------------------------------------------- 이슈
+
+  /** 이슈 1건 + 출처 저장. slug 가 이미 있으면 false. */
+  insertIssue(issue: NewIssue): boolean {
+    const exists = this.db.prepare(`SELECT 1 FROM issues WHERE slug = ?`).get(issue.slug);
+    if (exists) return false;
+    this.db.exec("BEGIN");
+    try {
+      const res = this.db
+        .prepare(`
+          INSERT INTO issues (slug, title, summary, body, tags, vtubers, event_date, published_at, status, origin)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'published', ?)
+        `)
+        .run(
+          issue.slug,
+          issue.title,
+          issue.summary,
+          issue.body,
+          JSON.stringify(issue.tags),
+          JSON.stringify(issue.vtubers),
+          issue.eventDate,
+          new Date().toISOString(),
+          issue.origin,
+        );
+      const issueId = Number(res.lastInsertRowid);
+      const ins = this.db.prepare(`
+        INSERT INTO issue_sources (issue_id, position, url, title, publisher, description, image_url, published_at, kind, embed_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      issue.sources.forEach((s, i) =>
+        ins.run(issueId, i, s.url, s.title, s.publisher, s.description, s.imageUrl, s.publishedAt, s.kind, s.embedId),
+      );
+      this.db.exec("COMMIT");
+      return true;
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+
+  private sourcesFor(issueIds: number[]): Map<number, IssueSource[]> {
+    const map = new Map<number, IssueSource[]>();
+    if (issueIds.length === 0) return map;
+    const rows = this.db
+      .prepare(`
+        SELECT * FROM issue_sources
+        WHERE issue_id IN (${issueIds.map(() => "?").join(",")})
+        ORDER BY issue_id, position
+      `)
+      .all(...issueIds) as unknown as Array<Record<string, unknown>>;
+    for (const r of rows) {
+      const id = Number(r.issue_id);
+      const list = map.get(id) ?? [];
+      list.push({
+        url: r.url as string,
+        title: (r.title as string | null) ?? (r.url as string),
+        publisher: (r.publisher as string | null) ?? null,
+        description: (r.description as string | null) ?? null,
+        imageUrl: (r.image_url as string | null) ?? null,
+        publishedAt: (r.published_at as string | null) ?? null,
+        kind: r.kind === "youtube" ? "youtube" : "link",
+        embedId: (r.embed_id as string | null) ?? null,
+      });
+      map.set(id, list);
+    }
+    return map;
+  }
+
+  private toIssue(r: Record<string, unknown>, sources: IssueSource[]): IssueItem {
+    return {
+      slug: r.slug as string,
+      title: r.title as string,
+      summary: r.summary as string,
+      body: r.body as string,
+      tags: parseTags(r.tags),
+      vtubers: parseTags(r.vtubers),
+      eventDate: (r.event_date as string | null) ?? null,
+      publishedAt: r.published_at as string,
+      status: r.status === "hidden" ? "hidden" : "published",
+      origin: r.origin === "manual" ? "manual" : "auto",
+      sources,
+    };
+  }
+
+  /** 이슈 목록 (최신순). includeHidden=false 면 공개된 것만. */
+  listIssues(limit = 50, includeHidden = false): IssueItem[] {
+    const rows = this.db
+      .prepare(`
+        SELECT * FROM issues
+        ${includeHidden ? "" : "WHERE status = 'published'"}
+        ORDER BY COALESCE(event_date, substr(published_at, 1, 10)) DESC, published_at DESC
+        LIMIT ?
+      `)
+      .all(limit) as unknown as Array<Record<string, unknown>>;
+    const sources = this.sourcesFor(rows.map((r) => Number(r.id)));
+    return rows.map((r) => this.toIssue(r, sources.get(Number(r.id)) ?? []));
+  }
+
+  getIssue(slug: string, includeHidden = false): IssueItem | null {
+    const r = this.db
+      .prepare(`SELECT * FROM issues WHERE slug = ? ${includeHidden ? "" : "AND status = 'published'"}`)
+      .get(slug) as Record<string, unknown> | undefined;
+    if (!r) return null;
+    return this.toIssue(r, this.sourcesFor([Number(r.id)]).get(Number(r.id)) ?? []);
+  }
+
+  /** 공개/숨김 전환. 대상이 없으면 false. */
+  setIssueStatus(slug: string, status: "published" | "hidden"): boolean {
+    const res = this.db.prepare(`UPDATE issues SET status = ? WHERE slug = ?`).run(status, slug);
+    return Number(res.changes) > 0;
+  }
+
+  /** 이미 출처로 쓰인 URL 인지 (중복 수집 방지) */
+  hasIssueSource(url: string): boolean {
+    return !!this.db.prepare(`SELECT 1 FROM issue_sources WHERE url = ? LIMIT 1`).get(url);
+  }
+
+  /** 최근 N일 이슈 제목 (숨김 포함 — 다시 올라오지 않도록) */
+  recentIssueTitles(days = 21): string[] {
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    const rows = this.db
+      .prepare(`SELECT title FROM issues WHERE published_at >= ? ORDER BY published_at DESC LIMIT 200`)
+      .all(since) as unknown as Array<{ title: string }>;
+    return rows.map((r) => r.title);
+  }
+
+  // ---------------------------------------------------------------- 메타 (작업 상태 등)
+
+  getMeta(key: string): string | null {
+    const r = this.db.prepare(`SELECT value FROM app_meta WHERE key = ?`).get(key) as
+      | { value: string | null }
+      | undefined;
+    return r?.value ?? null;
+  }
+
+  setMeta(key: string, value: string): void {
+    this.db
+      .prepare(`INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
+      .run(key, value);
   }
 }

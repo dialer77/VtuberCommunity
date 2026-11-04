@@ -21,4 +21,18 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL ?? "",
   /** 유저 데이터 API 보호용 공유 시크릿 (웹 서버 ↔ 백엔드). 비어있으면 유저 API 비활성 */
   internalSecret: process.env.INTERNAL_SECRET ?? "",
+
+  // ---- 이슈 자동 수집 (Claude Code 헤드리스 + 구독 인증) — docs/issue-collector.md
+  /** 1 이면 주기적으로 이슈 수집 */
+  issuesEnabled: process.env.ISSUES_ENABLED === "1",
+  /** 수집 주기(분). 기본 3시간 */
+  issuesIntervalMin: Number(process.env.ISSUES_INTERVAL_MIN ?? 180),
+  /** 한 번에 올릴 최대 이슈 수 */
+  issuesMaxPerRun: Number(process.env.ISSUES_MAX_PER_RUN ?? 5),
+  /** claude 실행 파일 경로 (비우면 자동 탐색) */
+  claudeBin: process.env.CLAUDE_BIN ?? "",
+  /** 사용할 모델 (비우면 구독 계정 기본값) */
+  claudeModel: process.env.CLAUDE_MODEL ?? "",
+  /** 1회 실행 제한 시간(ms) */
+  claudeTimeoutMs: Number(process.env.CLAUDE_TIMEOUT_MS ?? 15 * 60_000),
 };
