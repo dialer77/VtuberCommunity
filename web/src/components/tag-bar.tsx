@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { TagCount, TagKind } from "@/types";
+import { ScrollRow } from "@/components/scroll-row";
 
 const KIND_LABEL: Record<TagKind, string> = {
   agency: "소속사",
@@ -26,16 +27,13 @@ export function TagBar({
       .sort((a, b) => b.count - a.count),
   })).filter((g) => g.items.length > 0);
 
+  // 넓은 화면: 줄바꿈해서 전부 보이게 / 좁은 화면: 한 줄 가로 스크롤(스와이프·휠)
   return (
-    <div className="flex items-center gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 py-1">
+    <ScrollRow className="flex items-center gap-x-4 gap-y-2 overflow-x-auto no-scrollbar -mx-1 px-1 py-1 sm:flex-wrap sm:overflow-visible">
       <Chip href="/" label="전체" active={!active} />
-      {groups.map((g, i) => (
-        <div key={g.kind} className="flex items-center gap-2 shrink-0">
-          <span
-            className={`shrink-0 text-[11px] font-semibold text-muted-2 ${
-              i > 0 ? "border-l border-border pl-3" : ""
-            }`}
-          >
+      {groups.map((g) => (
+        <div key={g.kind} className="flex items-center gap-2 shrink-0 sm:shrink sm:flex-wrap">
+          <span className="shrink-0 text-[11px] font-semibold text-muted-2">
             {KIND_LABEL[g.kind]}
           </span>
           {g.items.map((t) => (
@@ -49,7 +47,7 @@ export function TagBar({
           ))}
         </div>
       ))}
-    </div>
+    </ScrollRow>
   );
 }
 

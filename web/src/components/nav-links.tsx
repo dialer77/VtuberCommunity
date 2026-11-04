@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ScrollRow } from "@/components/scroll-row";
 
 // V코인(/coins)은 테스트 기능이라 메뉴에서 뺐다 — URL 로만 접근 (비공개 베타).
 const LINKS = [
@@ -14,7 +15,7 @@ const LINKS = [
 export function NavLinks() {
   const pathname = usePathname();
   return (
-    <nav className="flex items-center gap-0.5 sm:gap-1 text-[13px] sm:text-sm overflow-x-auto no-scrollbar">
+    <ScrollRow as="nav" className="flex items-center gap-0.5 sm:gap-1 text-[13px] sm:text-sm overflow-x-auto no-scrollbar">
       {LINKS.map((l) => {
         const active =
           l.href === "/" ? pathname === "/" : pathname.startsWith(l.href);
@@ -32,6 +33,6 @@ export function NavLinks() {
           </Link>
         );
       })}
-    </nav>
+    </ScrollRow>
   );
 }
