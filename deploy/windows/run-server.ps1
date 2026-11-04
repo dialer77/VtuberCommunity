@@ -7,7 +7,7 @@
     2) 1분마다 GitHub(origin/<branch>)를 확인해 새 커밋을 반영한다.
          server/ 변경          → 서버 중지 → pull → (package*.json 변경 시 npm ci) → 재시작
          web/·docs/ 등만 변경  → pull 만 (재시작 없음)
-         deploy/windows/ 변경  → pull 후 이 스크립트 종료 → 작업 스케줄러가 5분 안에 새 버전으로 다시 실행
+         deploy/windows/ 변경  → pull 후 서버를 멈추고, 새 버전 스크립트로 즉시 다시 시작 (종료하지 않음)
 
   수동 실행(테스트용):
     powershell -ExecutionPolicy Bypass -File deploy\windows\run-server.ps1 -CheckIntervalSec 30
@@ -169,9 +169,13 @@ while ($true) {
       Write-Sup ('pull 완료 -> {0}' -f $u.Remote.Substring(0, 7))
       if ($u.DepsChanged) { New-Item -ItemType File -Force $NpmMarker | Out-Null }
       if ($u.SelfChanged) {
-        Write-Sup '감독 스크립트 변경 — 종료 후 작업 스케줄러가 새 버전으로 재실행 (최대 5분)'
-        $lock.ReleaseMutex()
-        exit 0
+        # 작업 스케줄러는 작업이 띄운 자식(node)이 살아 있으면 작업을 '실행 중'으로 보고 다시 띄우지 않는다.
+        # 그래서 종료하지 않고, 서버를 멈춘 뒤 같은 프로세스 안에서 새 버전 스크립트를 다시 실행한다.
+        # (같은 스레드라 중복 실행 방지 뮤텍스도 그대로 재획득된다)
+        Write-Sup '감독 스크립트 변경 — 서버를 멈추고 새 버전 감독으로 다시 시작'
+        Stop-ServerProcess $p
+        & $PSCommandPath -CheckIntervalSec $CheckIntervalSec -NoUpdate:$NoUpdate
+        exit $LASTEXITCODE
       }
       if ($u.ServerChanged) { $reason = 'update'; break }
       Write-Sup '서버 외 파일만 변경 — 재시작 없음'

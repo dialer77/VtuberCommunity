@@ -48,7 +48,7 @@
 | `server/**` | 서버 중지 → pull → 재시작 (수 초 다운) |
 | `server/package*.json` | 위 + `npm ci` |
 | `web/**`, `docs/**` 등만 | pull 만 (재시작 없음) |
-| `deploy/windows/**` | pull 후 감독 종료 → 작업 스케줄러가 5분 안에 새 버전으로 재실행 |
+| `deploy/windows/**` | pull 후 서버를 멈추고 새 버전 감독으로 즉시 다시 시작 |
 
 ---
 
