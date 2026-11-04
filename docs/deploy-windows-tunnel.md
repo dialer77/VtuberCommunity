@@ -108,7 +108,20 @@ setup 이 하는 일: Node 24+ 확인(없으면 winget 설치) → `server\.env`
 
 마지막에 출력되는 **`INTERNAL_SECRET`** 값을 복사해 둔다 (3단계에서 사용).
 
-## 3. Vercel — 웹 도메인 + 백엔드 주소 연결 (한 번만)
+## 3. Vercel — 웹 도메인 + 백엔드 주소 연결 (✅ 2026-11-05 CLI 로 완료)
+
+현재 상태 (개발 PC 에서 `vercel login` 후 CLI/API 로 설정, 검증 완료):
+
+| 항목 | 값 |
+|---|---|
+| 프로젝트 | `dialer77/vtuber-community` (Root Directory `web`, GitHub `main` push 시 자동 배포) |
+| 환경변수 (Production·Preview) | `BACKEND_URL=https://api.vmoa.live`, `SITE_URL=https://vmoa.live` |
+| 도메인 | `vmoa.live` (기본) · `www.vmoa.live` → `vmoa.live` 308 리다이렉트 |
+| Cloudflare DNS (DNS only) | `vmoa.live` A `216.198.79.1` · `www` CNAME `f3d2ad4329188041.vercel-dns-017.com` |
+
+환경변수를 바꾼 뒤에는 재배포가 필요하다: `cd web; vercel redeploy <최신 production URL> --environment production`
+
+아래는 대시보드로 할 때의 절차 (참고).
 
 **도메인 연결** — Vercel → 프로젝트 → **Settings → Domains** → `vmoa.live` 추가 (www 리다이렉트 제안은 수락).
 Vercel 이 보여주는 DNS 레코드를 Cloudflare → `vmoa.live` → **DNS → Records** 에 그대로 추가:
