@@ -10,6 +10,7 @@ import type {
   CoinItem,
   CoinSort,
   Issue,
+  DebutWindow,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -114,13 +115,8 @@ export async function fetchIssueFromBackend(slug: string): Promise<Issue | null>
   return (await res.json()) as Issue;
 }
 
-/** 신규 감지 채널. days 를 주면 그 기간 안에 처음 감지된 채널 */
-export async function fetchDebutsFromBackend(days?: number, limit = 20): Promise<DebutEvent[]> {
-  const qs = days ? `?days=${days}&limit=${limit}` : `?limit=${limit}`;
-  const res = await fetch(`${BASE}/api/debuts${qs}`, fetchInit());
-  if (!res.ok) throw new Error(`backend /api/debuts ${res.status}`);
-  const json = (await res.json()) as { debuts?: BackendDebut[] };
-  return (json.debuts ?? []).map((d) => ({
+function toDebutEvent(d: BackendDebut): DebutEvent {
+  return {
     id: d.channelId,
     vtuberName: d.channelName,
     platform: d.platform,
@@ -129,7 +125,45 @@ export async function fetchDebutsFromBackend(days?: number, limit = 20): Promise
     note: d.title,
     debutSignal: d.debutSignal,
     channelUrl: d.channelUrl,
-  }));
+  };
+}
+
+/** 최근 감지된 신규 채널 (홈 등 요약용) */
+export async function fetchDebutsFromBackend(limit = 20): Promise<DebutEvent[]> {
+  const res = await fetch(`${BASE}/api/debuts?limit=${limit}`, fetchInit());
+  if (!res.ok) throw new Error(`backend /api/debuts ${res.status}`);
+  const json = (await res.json()) as { debuts?: BackendDebut[] };
+  return (json.debuts ?? []).map(toDebutEvent);
+}
+
+/** 신규 데뷔 탭: since 이후 데뷔 방송 확인 채널 전부 + 새로 감지된 채널 최근 limit 개와 전체 개수 */
+export async function fetchDebutWindow(sinceIso: string, limit = 60): Promise<DebutWindow> {
+  const res = await fetch(
+    `${BASE}/api/debuts?since=${encodeURIComponent(sinceIso)}&limit=${limit}`,
+    fetchInit(),
+  );
+  if (!res.ok) throw new Error(`backend /api/debuts ${res.status}`);
+  const json = (await res.json()) as {
+    confirmed?: BackendDebut[];
+    detected?: BackendDebut[];
+    detectedTotal?: number;
+    debuts?: BackendDebut[];
+  };
+  if (json.confirmed) {
+    return {
+      confirmed: json.confirmed.map(toDebutEvent),
+      detected: (json.detected ?? []).map(toDebutEvent),
+      detectedTotal: json.detectedTotal ?? 0,
+    };
+  }
+  // 이전 백엔드(since 미지원) 호환 — 받은 목록을 기간으로 걸러 나눈다
+  const inRange = (json.debuts ?? []).map(toDebutEvent).filter((d) => d.debutAt >= sinceIso);
+  const detected = inRange.filter((d) => !d.debutSignal);
+  return {
+    confirmed: inRange.filter((d) => d.debutSignal),
+    detected: detected.slice(0, limit),
+    detectedTotal: detected.length,
+  };
 }
 
 export async function fetchRankingFromBackend(

@@ -559,6 +559,47 @@ export class SqliteStore implements Store {
     });
   }
 
+  /**
+   * 기간(since 이후) 신규 데뷔 창. 데뷔 방송 확인(🎀) 채널은 기간 안의 것을 **전부**,
+   * 새로 감지만 된 채널은 최근 detectedLimit 개 + 전체 개수. → 기간 안에 있는 동안은 목록에서 밀려나지 않는다.
+   */
+  getDebutsSince(
+    sinceIso: string,
+    detectedLimit = 60,
+  ): { confirmed: DebutItem[]; detected: DebutItem[]; detectedTotal: number } {
+    const select = `
+      SELECT c.channel_id, c.platform, c.name, c.first_seen_at, c.debut_signal,
+        COALESCE(
+          (SELECT title FROM live_snapshots s
+           WHERE s.channel_id = c.channel_id ORDER BY s.collected_at DESC LIMIT 1),
+          c.first_title
+        ) AS title
+      FROM channels c
+      WHERE c.first_seen_at >= ? AND c.debut_signal = ?
+      ORDER BY c.first_seen_at DESC`;
+    const map = (r: Record<string, unknown>): DebutItem => {
+      const platform = r.platform as Platform;
+      const channelId = r.channel_id as string;
+      return {
+        channelId,
+        channelName: r.name as string,
+        platform,
+        firstSeenAt: r.first_seen_at as string,
+        title: (r.title as string | null) ?? null,
+        debutSignal: Number(r.debut_signal) === 1,
+        channelUrl: channelUrl(platform, channelId),
+      };
+    };
+    const confirmed = (this.db.prepare(select).all(sinceIso, 1) as unknown as Array<Record<string, unknown>>).map(map);
+    const detected = (
+      this.db.prepare(`${select} LIMIT ?`).all(sinceIso, 0, detectedLimit) as unknown as Array<Record<string, unknown>>
+    ).map(map);
+    const total = this.db
+      .prepare(`SELECT COUNT(*) AS n FROM channels WHERE first_seen_at >= ? AND debut_signal = 0`)
+      .get(sinceIso) as { n: number };
+    return { confirmed, detected, detectedTotal: Number(total.n) };
+  }
+
   /** 윈도우(분) 내 평균 시청자 기준 랭킹 */
   getRanking(windowMinutes = 180, limit = 30): RankingItem[] {
     const cutoff = new Date(Date.now() - windowMinutes * 60_000).toISOString();

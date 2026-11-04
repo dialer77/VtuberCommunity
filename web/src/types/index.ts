@@ -56,6 +56,13 @@ export interface LiveStream {
 }
 
 /** 신규 데뷔 이벤트 (DETECT 단계에서 생성) */
+/** 신규 데뷔 탭 한 기간분: 데뷔 방송 확인 채널은 전부, 새로 감지된 채널은 최근 일부 + 전체 개수 */
+export interface DebutWindow {
+  confirmed: DebutEvent[];
+  detected: DebutEvent[];
+  detectedTotal: number;
+}
+
 export interface DebutEvent {
   id: string;
   vtuberName: string;

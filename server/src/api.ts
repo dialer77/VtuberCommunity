@@ -104,9 +104,21 @@ export function buildApi(store: SqliteStore) {
     };
   });
 
-  // 최근 감지된 신규 채널(데뷔 후보). ?days=90&limit=300 으로 기간 지정
-  app.get("/api/debuts", async (req) => {
-    const q = req.query as { days?: string; limit?: string };
+  // 최근 감지된 신규 채널(데뷔 후보).
+  //  ?since=<ISO>&limit=60 → { confirmed(기간 내 전부), detected(최근 limit개), detectedTotal }  ← 웹 신규 데뷔 탭
+  //  ?days=90&limit=300   → { debuts } (이전 형식)
+  app.get("/api/debuts", async (req, reply) => {
+    const q = req.query as { days?: string; limit?: string; since?: string };
+    if (q.since) {
+      const t = Date.parse(q.since);
+      if (Number.isNaN(t)) {
+        reply.code(400);
+        return { error: "invalid_since" };
+      }
+      // 너무 먼 과거는 막는다 (최대 1년)
+      const since = new Date(Math.max(t, Date.now() - 365 * 86_400_000)).toISOString();
+      return store.getDebutsSince(since, Math.min(200, Number(q.limit) || 60));
+    }
     const limit = Math.min(500, Number(q.limit) || 20);
     const debuts = store.getRecentDebuts(limit, Number(q.days) || undefined);
     return { count: debuts.length, debuts };

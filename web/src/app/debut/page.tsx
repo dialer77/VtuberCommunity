@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { DebutEvent } from "@/types";
-import { getDebutEvents } from "@/lib/data";
+import { getDebutWindow } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { PlatformBadge } from "@/components/platform-badge";
 import { Avatar } from "@/components/avatar";
@@ -81,18 +81,14 @@ export default async function DebutPage({
   const range: Range = r === "30d" || r === "90d" ? r : "month";
   const since = rangeStart(range);
 
-  const all = await getDebutEvents(92);
-  const inRange = all.filter((d) => Date.parse(d.debutAt) >= since);
-  const confirmed = inRange.filter((d) => d.debutSignal);
-  const detected = inRange
-    .filter((d) => !d.debutSignal)
-    .sort((a, b) => b.debutAt.localeCompare(a.debutAt));
+  // 기간 시작 이후에 처음 감지된 채널만 — 기간이 지나면(3개월 탭이면 90일) 목록에서 빠진다
+  const { confirmed, detected, detectedTotal } = await getDebutWindow(new Date(since).toISOString());
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="신규 데뷔"
-        description="라이브 목록에서 처음 감지된 채널이에요. 데뷔 방송이 확인된 채널(🎀)을 먼저 보여줘요."
+        description="데뷔(처음 감지)한 날부터 기간 동안 계속 보여요. 3개월이 지나면 신규 목록에서 빠져요. 데뷔 방송이 확인된 채널(🎀)을 먼저 보여줘요."
       />
 
       {/* 기간 탭 */}
@@ -131,7 +127,7 @@ export default async function DebutPage({
       <section className="flex flex-col gap-2.5">
         <div>
           <h2 className="font-bold">
-            새로 감지된 채널 <span className="text-muted-2 font-normal">{detected.length}</span>
+            새로 감지된 채널 <span className="text-muted-2 font-normal">{detectedTotal}</span>
           </h2>
           <p className="text-xs text-muted-2 mt-0.5">
             처음 감지된 시점 기준이라, 원래 활동하던 채널이 새로 잡힌 경우도 섞여 있어요.
@@ -146,8 +142,8 @@ export default async function DebutPage({
             ))}
           </ol>
         )}
-        {detected.length > MAX_DETECTED ? (
-          <p className="text-xs text-muted-2 text-center">최근 {MAX_DETECTED}개만 보여줘요 (전체 {detected.length}개)</p>
+        {detectedTotal > MAX_DETECTED ? (
+          <p className="text-xs text-muted-2 text-center">최근 {MAX_DETECTED}개만 보여줘요 (전체 {detectedTotal}개)</p>
         ) : null}
       </section>
     </div>

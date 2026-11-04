@@ -8,10 +8,11 @@ import type {
 import { RAW_LIVES, RAW_DEBUTS } from "@/lib/mock";
 import { loadIssues, loadIssue } from "@/lib/issues";
 import { fetchChzzkLives } from "@/lib/chzzk";
-import type { TagCount, ChannelProfile, CoinItem, CoinSort } from "@/types";
+import type { TagCount, ChannelProfile, CoinItem, CoinSort, DebutWindow } from "@/types";
 import {
   fetchLivesFromBackend,
   fetchDebutsFromBackend,
+  fetchDebutWindow,
   fetchRankingFromBackend,
   fetchRisingFromBackend,
   fetchTags,
@@ -88,16 +89,27 @@ function mockLiveStreams(): LiveStream[] {
   })).sort((a, b) => b.viewers - a.viewers);
 }
 
-/** 신규 데뷔(처음 감지된 채널). days 를 주면 그 기간 안에 감지된 채널을 넉넉히 가져온다. */
-export async function getDebutEvents(days?: number): Promise<DebutEvent[]> {
+export async function getDebutEvents(): Promise<DebutEvent[]> {
   // 백엔드(자체 DB의 first-seen 채널) 우선, 없으면 목
   try {
-    const debuts = await fetchDebutsFromBackend(days, days ? 400 : 20);
+    const debuts = await fetchDebutsFromBackend();
     if (debuts.length > 0) return debuts;
   } catch {
     // 백엔드 미기동 — 목 폴백
   }
   return mockDebutEvents();
+}
+
+/** 신규 데뷔 탭 한 기간분 (since 이후). 기간 안에 있는 동안은 목록에서 밀려나지 않는다. */
+export async function getDebutWindow(sinceIso: string): Promise<DebutWindow> {
+  try {
+    return await fetchDebutWindow(sinceIso, 60);
+  } catch {
+    // 백엔드 미기동 — 목 폴백
+  }
+  const inRange = mockDebutEvents().filter((d) => d.debutAt >= sinceIso);
+  const detected = inRange.filter((d) => !d.debutSignal);
+  return { confirmed: inRange.filter((d) => d.debutSignal), detected, detectedTotal: detected.length };
 }
 
 function mockDebutEvents(): DebutEvent[] {
