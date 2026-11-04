@@ -144,12 +144,29 @@ export interface ChannelProfile {
 }
 
 /** 이슈 타임라인 아이템 (수동 큐레이션 콘텐츠) */
+/** 이슈 출처 (기사 미리보기 카드 / 유튜브 임베드) */
+export interface IssueSource {
+  url: string;
+  title: string;
+  publisher: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  publishedAt: string | null;
+  kind: "link" | "youtube";
+  embedId: string | null;
+}
+
 export interface Issue {
   slug: string;
   title: string;
   summary: string;
-  /** 본문 (마크다운 등 — 지금은 평문) */
+  /** 본문 (마크다운) */
   body: string;
   tags: string[];
   publishedAt: string; // ISO
+  /** 사건/발표 날짜 (YYYY-MM-DD). 없으면 publishedAt 기준 */
+  eventDate: string | null;
+  /** auto = 백엔드가 AI 로 수집·정리, manual = 운영자가 직접 작성(content/issues/*.md) */
+  origin: "auto" | "manual";
+  sources: IssueSource[];
 }

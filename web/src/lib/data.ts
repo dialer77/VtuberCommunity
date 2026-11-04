@@ -6,7 +6,7 @@ import type {
   RisingEntry,
 } from "@/types";
 import { RAW_LIVES, RAW_DEBUTS } from "@/lib/mock";
-import { loadIssues, loadIssue, issueSlugs } from "@/lib/issues";
+import { loadIssues, loadIssue } from "@/lib/issues";
 import { fetchChzzkLives } from "@/lib/chzzk";
 import type { TagCount, ChannelProfile, CoinItem, CoinSort } from "@/types";
 import {
@@ -17,11 +17,13 @@ import {
   fetchTags,
   fetchChannelProfile,
   fetchCoins,
+  fetchIssuesFromBackend,
+  fetchIssueFromBackend,
 } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
 // 라이브/데뷔는 백엔드(자체 DB) 우선 → 백엔드 없으면 치지직 직접 → 목 폴백.
-// 이슈는 아직 목 데이터(수동 콘텐츠).
+// 이슈는 백엔드 자동 수집(AI 정리) + 운영자 마크다운.
 
 export async function getLiveStreams(tag?: string): Promise<LiveStream[]> {
   // 1) 백엔드(자체 DB) 우선 — 태그 필터는 백엔드에서만 지원
@@ -86,10 +88,11 @@ function mockLiveStreams(): LiveStream[] {
   })).sort((a, b) => b.viewers - a.viewers);
 }
 
-export async function getDebutEvents(): Promise<DebutEvent[]> {
+/** 신규 데뷔(처음 감지된 채널). days 를 주면 그 기간 안에 감지된 채널을 넉넉히 가져온다. */
+export async function getDebutEvents(days?: number): Promise<DebutEvent[]> {
   // 백엔드(자체 DB의 first-seen 채널) 우선, 없으면 목
   try {
-    const debuts = await fetchDebutsFromBackend();
+    const debuts = await fetchDebutsFromBackend(days, days ? 400 : 20);
     if (debuts.length > 0) return debuts;
   } catch {
     // 백엔드 미기동 — 목 폴백
@@ -139,14 +142,35 @@ export async function getRising(): Promise<RisingEntry[]> {
   }
 }
 
+/** 이슈 정렬 기준일: 사건 날짜 → 게시일 */
+function issueSortKey(i: Issue): string {
+  return i.eventDate ?? i.publishedAt.slice(0, 10);
+}
+
+// 이슈 = 백엔드 자동 수집(AI 정리) + 운영자가 쓴 마크다운(content/issues). 백엔드가 없으면 마크다운만.
 export async function getIssues(): Promise<Issue[]> {
-  return loadIssues();
+  let auto: Issue[] = [];
+  try {
+    auto = await fetchIssuesFromBackend();
+  } catch {
+    // 백엔드 미기동
+  }
+  return [...auto, ...loadIssues()].sort(
+    (a, b) =>
+      issueSortKey(b).localeCompare(issueSortKey(a)) || b.publishedAt.localeCompare(a.publishedAt),
+  );
 }
 
 export async function getIssueBySlug(slug: string): Promise<Issue | null> {
-  return loadIssue(slug);
+  const manual = loadIssue(slug);
+  if (manual) return manual;
+  try {
+    return await fetchIssueFromBackend(slug);
+  } catch {
+    return null;
+  }
 }
 
 export async function getIssueSlugs(): Promise<string[]> {
-  return issueSlugs();
+  return (await getIssues()).map((i) => i.slug);
 }

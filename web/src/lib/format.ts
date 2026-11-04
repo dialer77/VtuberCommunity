@@ -47,3 +47,8 @@ export function debutCountdown(iso: string): string {
   if (days === -1) return "어제";
   return `${-days}일 전`;
 }
+
+/** 이슈의 기준 시각: 사건 날짜(KST 자정) → 없으면 게시 시각 */
+export function issueDate(issue: { eventDate: string | null; publishedAt: string }): string {
+  return issue.eventDate ? `${issue.eventDate}T00:00:00+09:00` : issue.publishedAt;
+}

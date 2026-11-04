@@ -44,6 +44,13 @@ export const metadata: Metadata = {
     title: "버모아 · VMOA",
     description: DESCRIPTION,
   },
+  // 검색엔진 소유 확인 (HTML 태그 방식을 쓸 때만). 도메인 속성(DNS TXT)으로 확인했다면 비워둬도 된다.
+  verification: {
+    google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
+    other: process.env.NAVER_SITE_VERIFICATION
+      ? { "naver-site-verification": process.env.NAVER_SITE_VERIFICATION }
+      : undefined,
+  },
 };
 
 // 페인트 전에 저장된 테마를 적용해 깜빡임(FOUC) 방지
