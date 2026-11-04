@@ -39,7 +39,7 @@ export default async function VtuberProfilePage({
         href="/"
         className="text-sm text-muted hover:text-accent transition-colors w-fit"
       >
-        ← 지금 방송 중
+        ← LIVE
       </Link>
 
       {/* 헤더 */}

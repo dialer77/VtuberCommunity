@@ -29,7 +29,7 @@ export default async function HomePage({
             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-live" />
           </span>
           <h1 className="text-2xl font-extrabold tracking-tight">
-            {activeTag ? `${activeTag.emoji} ${activeTag.label}` : "지금 방송 중"}
+            {activeTag ? `${activeTag.emoji} ${activeTag.label}` : "LIVE"}
           </h1>
         </div>
         <div className="grid grid-cols-3 gap-3 max-w-md">

@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   title: "V코인 시세판",
   description:
     "버튜버를 시청자 기반 지수로 줄세운 가상 시세판. 시가총액·급등·급락으로 지금 뜨고 지는 버튜버를 한눈에.",
+  // 테스트 기능 — 메뉴·사이트맵에서 빠져 있고 검색엔진에도 노출하지 않는다 (URL 로만 접근).
+  robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
@@ -36,7 +38,7 @@ export default async function CoinsPage({
       <div className="flex flex-col gap-2">
         <PageHeader
           title="🪙 V코인 시세판"
-          description="버튜버를 시청자 기반 지수로 줄세운 가상 시세. 재미용이에요."
+          description="🧪 베타 테스트 중 · 버튜버를 시청자 기반 지수로 줄세운 가상 시세. 재미용이에요."
           live
         />
       </div>

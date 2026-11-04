@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// V코인(/coins)은 테스트 기능이라 메뉴에서 뺐다 — URL 로만 접근 (비공개 베타).
 const LINKS = [
-  { href: "/", label: "지금 방송중" },
+  { href: "/", label: "LIVE" },
   { href: "/ranking", label: "랭킹" },
-  { href: "/coins", label: "V코인" },
   { href: "/debut", label: "신규 데뷔" },
   { href: "/issue", label: "이슈" },
 ];

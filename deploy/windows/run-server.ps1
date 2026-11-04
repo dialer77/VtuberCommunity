@@ -4,7 +4,7 @@
 
   하는 일
     1) server 를 띄우고, 죽으면 다시 띄운다. (곧바로 다시 죽으면 점점 늦게: 10초 → 최대 5분)
-    2) 주기적으로 GitHub(origin/<branch>)를 확인해 새 커밋을 반영한다.
+    2) 1분마다 GitHub(origin/<branch>)를 확인해 새 커밋을 반영한다.
          server/ 변경          → 서버 중지 → pull → (package*.json 변경 시 npm ci) → 재시작
          web/·docs/ 등만 변경  → pull 만 (재시작 없음)
          deploy/windows/ 변경  → pull 후 이 스크립트 종료 → 작업 스케줄러가 5분 안에 새 버전으로 다시 실행
@@ -13,7 +13,7 @@
     powershell -ExecutionPolicy Bypass -File deploy\windows\run-server.ps1 -CheckIntervalSec 30
 #>
 param(
-  [int]$CheckIntervalSec = 300,
+  [int]$CheckIntervalSec = 60,   # GitHub 확인 주기 — push 후 최대 1분 안에 반영
   [switch]$NoUpdate
 )
 $ErrorActionPreference = 'Continue'

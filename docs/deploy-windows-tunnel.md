@@ -17,7 +17,7 @@
 
 ```
 [개발 PC]                         [GitHub]                    [배포 PC (Windows 10)]
- 코드 수정 → git push ─────────▶  main  ◀── 5분마다 확인 ───  작업 스케줄러 'VMOA-Server' (SYSTEM)
+ 코드 수정 → git push ─────────▶  main  ◀── 1분마다 확인 ───  작업 스케줄러 'VMOA-Server' (SYSTEM)
                                     │                          └ run-server.ps1 (감독)
                                     ▼                              ├ server (node) :4000
                               Vercel 자동 배포 (web)                └ 새 커밋 → pull → 재시작
@@ -159,7 +159,7 @@ Vercel 이 보여주는 DNS 레코드를 Cloudflare → `vmoa.live` → **DNS �
 
 ## 운영
 
-**코드 업데이트**: 개발 PC 에서 `git push` 만 하면 끝. 배포 PC 는 5분 안에 반영 (`status.ps1` 의 "코드 버전"으로 확인).
+**코드 업데이트**: 개발 PC 에서 `git push` 만 하면 끝. 배포 PC 는 1분 안에 반영 (`status.ps1` 의 "코드 버전"으로 확인). 웹(Vercel)도 push 후 1분 내외.
 
 **설정(`.env`) 변경**: 배포 PC 에서 `C:\vmoa\server\.env` 수정 → `restart.ps1` 실행. (`.env` 는 git 에 안 올라감)
 
