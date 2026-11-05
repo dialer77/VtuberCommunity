@@ -7,6 +7,8 @@ import { PostgresStore } from "./store/postgres";
 import type { Store } from "./store/types";
 import { log } from "./log";
 import { startAiJobs } from "./issues/scheduler";
+import { buildAgencyRoster, loadRosterSeed } from "./tags/roster";
+import { setAgencyRoster } from "./tags/catalog";
 
 function makeStore(): Store {
   switch (config.storeKind) {
@@ -26,6 +28,22 @@ if (store instanceof SqliteStore) {
   const pollMin = config.pollIntervalMs / 60_000;
   const n = store.backfillDailyStats(pollMin, pollMin * 2);
   if (n > 0) log.info(`일별 집계 백필: 스냅샷 ${n}사이클 반영`);
+  const b = store.backfillBroadcastTags();
+  if (b > 0) log.info(`방송별 태그 백필: ${b}개 방송`);
+
+  // 소속사 명단: 방송 기록에서 꾸준히 소속사 태그를 단 채널 + 웹 데뷔 소식의 소속사 + 미리 계산한 명단 (30분마다 갱신)
+  const rosterSeed = loadRosterSeed();
+  const refreshRoster = (s: SqliteStore) => {
+    const debutAgencies = s
+      .listDebutReports()
+      .filter((r) => r.channelId && r.agency)
+      .map((r) => ({ channelId: r.channelId as string, agency: r.agency as string }));
+    const roster = buildAgencyRoster(s.listBroadcastTags(90), debutAgencies, rosterSeed);
+    setAgencyRoster(roster);
+    return roster.size;
+  };
+  log.info(`소속사 명단: ${refreshRoster(store)}개 채널`);
+  setInterval(() => refreshRoster(store), 30 * 60_000);
 }
 
 // REST API (읽기 라우트는 SqliteStore 기준)

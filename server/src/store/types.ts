@@ -13,6 +13,9 @@ export interface Store {
   /** 한 사이클을 일별 집계(기간 랭킹용)에 반영. minutes = 이 사이클이 대표하는 시간. (구현은 선택) */
   recordDailyStats?(snapshots: LiveSnapshot[], minutes: number): void;
 
+  /** 방송별 자가 태그 기록 (소속사 명단 계산용). (구현은 선택) */
+  recordBroadcastTags?(snapshots: LiveSnapshot[]): void;
+
   /** 버튜버 확정 목록 (태그 없어도 인정 + 순위 밖이어도 방송 직접 확인). (구현은 선택) */
   listRegistry?(): RegistryEntry[];
 

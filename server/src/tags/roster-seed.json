@@ -1,0 +1,601 @@
+{
+ "note": "7~8월 수집 기록(방송 16569개)에서 소속사 태그를 꾸준히(60%+, 2회+) 단 채널. 서버가 실시간 기록과 합쳐 사용. + 웹 데뷔 소식으로 확인된 채널(source 표기).",
+ "generatedAt": "2026-11-05",
+ "channels": {
+  "b5ed5db484d04faf4d150aedd362f34b": {
+   "name": "강지",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "gosegu2": {
+   "name": "고세구!",
+   "agencies": [
+    "isegye"
+   ]
+  },
+  "syasya0w0": {
+   "name": "공주샤샤",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "kwakchunshik": {
+   "name": "곽춘식",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "kwonmingomem": {
+   "name": "권민입니다",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "gwangsoo1": {
+   "name": "길앞잡이광수",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "wldnjsdpqh": {
+   "name": "나른자",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "4515b179f86b67b4981e16190817c580": {
+   "name": "네네코 마시로",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "nnininin": {
+   "name": "닌닌_",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "b82e8bc2505e37156b2d1140ba1fc05c": {
+   "name": "담유이",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "deathhammer": {
+   "name": "데스해머쵸로",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "xxxx922": {
+   "name": "도깨비루딘",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "dokkhye0000": {
+   "name": "독고혜지_",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "798e100206987b59805cfb75f927e965": {
+   "name": "디디디용",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "f380f620615fffd54451032686932f9d": {
+   "name": "디온 Dion",
+   "agencies": [
+    "charon"
+   ]
+  },
+  "jey422": {
+   "name": "뢴트게늄",
+   "agencies": [
+    "wakta",
+    "isegye"
+   ]
+  },
+  "sangsoak": {
+   "name": "루석_",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "f36320c432d9f06095ce2cfbbf681c26": {
+   "name": "류시호 RyuSiho",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "allure282": {
+   "name": "리르",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "lilpa0309": {
+   "name": "릴파♬",
+   "agencies": [
+    "isegye"
+   ]
+  },
+  "bd07973b6021d72512240c01a386d5c9": {
+   "name": "망내",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "c62ac389ebfc8942302298df5e9cd71b": {
+   "name": "매화린 Maehwarin",
+   "agencies": [
+    "grimm"
+   ]
+  },
+  "0a808138cc8c96ab9756935b964c1bf7": {
+   "name": "먀뮤뮤",
+   "agencies": [
+    "grimm"
+   ]
+  },
+  "be059789e19ac3e46198e15911a80122": {
+   "name": "모이 M0I",
+   "agencies": [
+    "grimm"
+   ]
+  },
+  "barobarosaya": {
+   "name": "무녀사야",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "23a256033aae1c6324cec9a69458791d": {
+   "name": "므므네 mumune",
+   "agencies": [
+    "grimm"
+   ]
+  },
+  "n1574cat": {
+   "name": "미미짱짱세용",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "088973112d8acc831ec20274f7ffbb99": {
+   "name": "미하루 Miharu",
+   "agencies": [
+    "charon"
+   ]
+  },
+  "d916dc846dcbe66a3482e238625b9022": {
+   "name": "백희 Baekhee",
+   "agencies": [
+    "grimm"
+   ]
+  },
+  "bulgom77": {
+   "name": "보디가드불독",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "dae2de8eaa005a59163f2e4c045e1aa1": {
+   "name": "블레어 로즈",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "secretto486": {
+   "name": "비밀소녀♥",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "5c897b3e639045ca6e314bbaff991f73": {
+   "name": "비올레타 모네",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "viichan6": {
+   "name": "비챤",
+   "agencies": [
+    "isegye"
+   ]
+  },
+  "521b37e8cd74b933501d3d1ad4d5031c": {
+   "name": "비화 Bihwa",
+   "agencies": [
+    "grimm"
+   ]
+  },
+  "toryvac": {
+   "name": "빅토리~!",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "36ddb9bb4f17593b60f1b63cec86611d": {
+   "name": "사키하네 후야",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "sl0724": {
+   "name": "성기사샬롯",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "nqwer5031": {
+   "name": "소피아-",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "cb0ceb32cbf6bced3bac7892cbca37e1": {
+   "name": "쇼코코 도리",
+   "agencies": [
+    "ristella"
+   ]
+  },
+  "soosemi432": {
+   "name": "수셈이",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "6636ac6dcac9c0b1e93b8259b8aced8d": {
+   "name": "시노 레이",
+   "agencies": [
+    "afterlive"
+   ]
+  },
+  "b044e3a3b9259246bc92e863e7d3f3b8": {
+   "name": "시라유키 히나",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "sirianrain": {
+   "name": "시리안_레인",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "a6c4ddb09cdb160478996007bff35296": {
+   "name": "아라하시 타비",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "941ea3807ba8b9b7dddb1670e3e7e5af": {
+   "name": "아마네 나기 Planeta",
+   "agencies": [
+    "planeta"
+   ]
+  },
+  "2b777f88980e1eda075a9de9928e54cc": {
+   "name": "아마네루 피요",
+   "agencies": [
+    "afterlive"
+   ]
+  },
+  "dd6cf0d465dae40bc4a83f78abd58352": {
+   "name": "아미하 유네",
+   "agencies": [
+    "ristella"
+   ]
+  },
+  "45e71a76e949e16a34764deb962f9d9f": {
+   "name": "아야츠노 유니",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "516937b5f85cbf2249ce31b0ad046b0f": {
+   "name": "아오쿠모 린",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "ff182197eed405b1130d22aa3a4fefa0": {
+   "name": "아일라 Iyla",
+   "agencies": [
+    "grimm"
+   ]
+  },
+  "4325b1d5bbc321fad3042306646e2e50": {
+   "name": "아카네 리제",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "yaguja00": {
+   "name": "야구자",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "e87999abca4fd0c3214e05ef414ce951": {
+   "name": "야토 Yato",
+   "agencies": [
+    "ristella"
+   ]
+  },
+  "475313e6c26639d5763628313b4c130e": {
+   "name": "엘리",
+   "agencies": [
+    "charon"
+   ]
+  },
+  "da098b7b6def60b21ba450c110bf5239": {
+   "name": "연하온",
+   "agencies": [
+    "mongsang"
+   ]
+  },
+  "f3b204dd3fd6925835ca1848cd4b6d3c": {
+   "name": "오단밍",
+   "agencies": [
+    "ristella"
+   ]
+  },
+  "d547c7021e8eb042acf57a315bad7d35": {
+   "name": "오르 Or",
+   "agencies": [
+    "charon"
+   ]
+  },
+  "fd9d35299c6816ad7c7fc6867cc7c195": {
+   "name": "오리고기 ORIGOGI",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "65a53076fe1a39636082dd6dba8b8a4b": {
+   "name": "오화요 Ohwayo",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "5d68142291810fa1a2a0dfa90a688362": {
+   "name": "유람 Yuram",
+   "agencies": [
+    "charon"
+   ]
+  },
+  "8fd39bb8de623317de90654718638b10": {
+   "name": "유즈하 리코",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "55cad23e436b9b31f5e0fffe3d588194": {
+   "name": "자두뇨끼",
+   "agencies": [
+    "mongsang"
+   ]
+  },
+  "jegaltong": {
+   "name": "제갈_통",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "c9e23f9b2d858601ac5f20f46634cce2": {
+   "name": "조하구1",
+   "agencies": [
+    "charon"
+   ]
+  },
+  "cotton1217": {
+   "name": "주르르",
+   "agencies": [
+    "wakta",
+    "isegye"
+   ]
+  },
+  "jinhejinhe": {
+   "name": "진희이니타",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "jingburger1": {
+   "name": "징버거☆",
+   "agencies": [
+    "wakta",
+    "isegye"
+   ]
+  },
+  "ak6006": {
+   "name": "천수이",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "gilbet1801": {
+   "name": "철도왕길버트",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "42344dd53d4c5dc33e962c8913f6adc3": {
+   "name": "청목 Chungmok",
+   "agencies": [
+    "grimm"
+   ]
+  },
+  "65c3035bdc598c81f15a8fe0e958b3ce": {
+   "name": "초승달",
+   "agencies": [
+    "planeta"
+   ]
+  },
+  "goatgobong": {
+   "name": "촌장_고봉",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "d5e2e0c14dcca4c4b10c7c9633022f52": {
+   "name": "치치 Planeta",
+   "agencies": [
+    "planeta"
+   ]
+  },
+  "5ead7124638ac4c568f2cde0224b3b6b": {
+   "name": "카네코 파냐 Planeta",
+   "agencies": [
+    "planeta"
+   ]
+  },
+  "coderose": {
+   "name": "코드네임ROSE",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "6c60ddcd83b2543a4a339a79fbdbb949": {
+   "name": "콘야 유메이",
+   "agencies": [
+    "afterlive"
+   ]
+  },
+  "e6df84b539791aba763f533f87ce3342": {
+   "name": "쿠마루",
+   "agencies": [
+    "mongsang"
+   ]
+  },
+  "59aa824e4c4a56dd51e7a5e2e9172648": {
+   "name": "쿠온 레이 Planeta",
+   "agencies": [
+    "planeta"
+   ]
+  },
+  "64d76089fba26b180d9c9e48a32600d9": {
+   "name": "텐코 시부키",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "w96idqb": {
+   "name": "티파니0421",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "3e3781d3bd20dadc2f6f6d5d30091195": {
+   "name": "포포포포 POPOPOPO",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "4d812b586ff63f8a2946e64fa860bbf5": {
+   "name": "하나코 나나",
+   "agencies": [
+    "stellive"
+   ]
+  },
+  "3d11f301d71cce5bcd1e96bbaec314be": {
+   "name": "하루나엘",
+   "agencies": [
+    "mongsang"
+   ]
+  },
+  "474b909039b3944632e35acdfb217d3a": {
+   "name": "하루야 치에",
+   "agencies": [
+    "afterlive"
+   ]
+  },
+  "b33c957eac9335d38e4043c3dca97675": {
+   "name": "하시요 HaSiyo",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "1296a4df3696511c2239cf641cfd0fd0": {
+   "name": "하야시 이로",
+   "agencies": [
+    "mongsang"
+   ]
+  },
+  "7792c631f74f66e92ae25949a3a11abb": {
+   "name": "하쿠텐 후와",
+   "agencies": [
+    "ristella"
+   ]
+  },
+  "9351fb8417f73405c84e0846409e3263": {
+   "name": "햄쿠비",
+   "agencies": [
+    "ristella"
+   ]
+  },
+  "c0d9723cbb75dc223c6aa8a9d4f56002": {
+   "name": "허니츄러스",
+   "agencies": [
+    "projecta"
+   ]
+  },
+  "5786141997728cc2fcd660a15ef5f3af": {
+   "name": "호시에 제로",
+   "agencies": [
+    "mongsang"
+   ]
+  },
+  "227b431ef15d1085ba29f54b8a7048fd": {
+   "name": "홍서월",
+   "agencies": [
+    "mongsang"
+   ]
+  },
+  "ttobeherored": {
+   "name": "히어로레드",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "srgdragunov": {
+   "name": "S.드라구노프",
+   "agencies": [
+    "wakta"
+   ]
+  },
+  "2299fad4bebb504b0978e1ec08b2f7d3": {
+   "name": "시즈키 토아",
+   "agencies": [
+    "stellive"
+   ],
+   "source": "웹 데뷔 소식 (스텔라이브 4기, 2026-10-17~18 데뷔)"
+  },
+  "c657aa3592260a2b59669a72ec151936": {
+   "name": "코가네 랑",
+   "agencies": [
+    "stellive"
+   ],
+   "source": "웹 데뷔 소식 (스텔라이브 4기, 2026-10-17~18 데뷔)"
+  },
+  "49d2c3cf8f0b2843d934ec15e82bb54c": {
+   "name": "하나요 히요리",
+   "agencies": [
+    "stellive"
+   ],
+   "source": "웹 데뷔 소식 (스텔라이브 4기, 2026-10-17~18 데뷔)"
+  },
+  "792acf9ca28b42918710327e14b06b68": {
+   "name": "토키노 메리",
+   "agencies": [
+    "stellive"
+   ],
+   "source": "웹 데뷔 소식 (스텔라이브 4기, 2026-10-17~18 데뷔)"
+  }
+ }
+}

@@ -57,6 +57,7 @@ export async function runCycle(store: Store, cycle: number): Promise<void> {
   const minutes = lastCycleMs ? Math.min((nowMs - lastCycleMs) / 60_000, pollMin * 2) : pollMin;
   lastCycleMs = nowMs;
   store.recordDailyStats?.(snapshots, minutes);
+  store.recordBroadcastTags?.(snapshots);
 
   // 4. DETECT — 신규 채널(first-seen) = 데뷔 후보
   const newly = await store.markNewChannels(snapshots);

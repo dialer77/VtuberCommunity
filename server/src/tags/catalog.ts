@@ -76,7 +76,9 @@ const AUTO_MAP: Array<[string, string]> = [
   ["신인", "rookie"],
 ];
 
-/** 스트리머 자가 태그에서 VMOA 태그 id를 안전하게 추출 */
+const AGENCY_IDS = new Set(TAG_CATALOG.filter((t) => t.kind === "agency").map((t) => t.id));
+
+/** 스트리머 자가 태그에서 VMOA 태그 id를 안전하게 추출 (소속사 포함 — 명단 계산용) */
 export function autoTags(rawTags: string[]): string[] {
   const low = rawTags.map((t) => t.toLowerCase());
   const out = new Set<string>();
@@ -86,10 +88,26 @@ export function autoTags(rawTags: string[]): string[] {
   return [...out];
 }
 
+/** 텍스트(자가 태그·소속사 이름)에 들어 있는 소속사 태그 id */
+export function agencyIdsInText(texts: string[]): string[] {
+  return autoTags(texts).filter((id) => AGENCY_IDS.has(id));
+}
+
+// 소속사 명단 (tags/roster.ts 에서 계산, 서버가 30분마다 갱신). channelId → 소속사 태그 id[]
+let AGENCY_ROSTER = new Map<string, string[]>();
+export function setAgencyRoster(roster: Map<string, string[]>): void {
+  AGENCY_ROSTER = roster;
+}
+
 // 관리자 수동 큐레이션 태그. channelId → tagId[]
 // (자가 태그로 안 잡히는 컨셉 속성 등을 여기서 보강. 공개 제보는 받지 않음)
 export const MANUAL_TAGS: Record<string, string[]> = {
   // "channelIdExample": ["furry"],
+};
+
+// 관리자 수동 제외 (자동 판정이 틀린 경우). channelId → tagId[]
+export const MANUAL_DENY: Record<string, string[]> = {
+  // "channelIdExample": ["stellive"],
 };
 
 /** 채널의 최종 VMOA 태그 id 목록 (자동 + 수동 병합, 유효 id만) */
@@ -97,7 +115,11 @@ export function resolveChannelTags(
   channelId: string,
   rawTags: string[],
 ): string[] {
-  const ids = new Set<string>(autoTags(rawTags));
+  // 콘텐츠·컨셉 태그는 이번 방송의 자가 태그에서, 소속사 태그는 명단에서만
+  // (방송 하나에 '스텔라이브' 태그를 달았다고 멤버가 아님 — 관련 콘텐츠·리액션 방송 오분류 방지)
+  const ids = new Set<string>(autoTags(rawTags).filter((id) => !AGENCY_IDS.has(id)));
+  for (const id of AGENCY_ROSTER.get(channelId) ?? []) ids.add(id);
   for (const id of MANUAL_TAGS[channelId] ?? []) ids.add(id);
+  for (const id of MANUAL_DENY[channelId] ?? []) ids.delete(id);
   return [...ids].filter((id) => VALID_IDS.has(id));
 }

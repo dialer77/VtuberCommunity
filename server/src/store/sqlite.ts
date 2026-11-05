@@ -368,6 +368,15 @@ export class SqliteStore implements Store {
         PRIMARY KEY (platform, channel_id)
       );
 
+      CREATE TABLE IF NOT EXISTS broadcast_tags (
+        channel_id TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        platform   TEXT NOT NULL,
+        tags       TEXT NOT NULL,
+        PRIMARY KEY (channel_id, started_at)
+      );
+      CREATE INDEX IF NOT EXISTS idx_broadcast_tags_started ON broadcast_tags(started_at);
+
       CREATE TABLE IF NOT EXISTS app_meta (
         key   TEXT PRIMARY KEY,
         value TEXT
@@ -1122,6 +1131,48 @@ export class SqliteStore implements Store {
     pool.sort((a, b) => key[metric](b) - key[metric](a));
     const first = this.db.prepare(`SELECT MIN(date) AS d FROM channel_daily`).get() as { d: string | null };
     return { since, trackingSince: first?.d ?? null, ranking: pool.slice(0, limit) };
+  }
+
+  // ---------------------------------------------------------------- 방송별 자가 태그 (소속사 명단 계산용)
+
+  /** 방송(채널+시작시각)마다 자가 태그를 남긴다 — 스냅샷이 지워져도 소속사 판단 근거로 유지 */
+  recordBroadcastTags(snapshots: LiveSnapshot[]): void {
+    if (snapshots.length === 0) return;
+    const stmt = this.db.prepare(`
+      INSERT INTO broadcast_tags (channel_id, started_at, platform, tags) VALUES (?, ?, ?, ?)
+      ON CONFLICT(channel_id, started_at) DO UPDATE SET tags = excluded.tags
+    `);
+    this.db.exec("BEGIN");
+    try {
+      for (const s of snapshots) stmt.run(s.channelId, s.startedAt, s.platform, JSON.stringify(s.tags ?? []));
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+
+  /** 비어 있으면 남은 스냅샷에서 한 번 채움. 채운 방송 수 반환 */
+  backfillBroadcastTags(): number {
+    if (this.db.prepare(`SELECT 1 FROM broadcast_tags LIMIT 1`).get()) return 0;
+    const res = this.db
+      .prepare(`
+        INSERT OR IGNORE INTO broadcast_tags (channel_id, started_at, platform, tags)
+        SELECT channel_id, started_at, platform, COALESCE(MAX(tags), '[]')
+        FROM live_snapshots WHERE started_at IS NOT NULL
+        GROUP BY channel_id, started_at
+      `)
+      .run();
+    return Number(res.changes);
+  }
+
+  /** 최근 N일 방송별 자가 태그 */
+  listBroadcastTags(days = 90): { channelId: string; tags: string[] }[] {
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    const rows = this.db
+      .prepare(`SELECT channel_id, tags FROM broadcast_tags WHERE started_at >= ?`)
+      .all(since) as unknown as Array<{ channel_id: string; tags: string }>;
+    return rows.map((r) => ({ channelId: r.channel_id, tags: parseTags(r.tags) }));
   }
 
   // ---------------------------------------------------------------- 이슈
