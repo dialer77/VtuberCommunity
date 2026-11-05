@@ -10,6 +10,7 @@ import {
 } from "./tags/catalog";
 import { curatedProfile } from "./profiles";
 import { config } from "./config";
+import { VERSION, STARTED_AT } from "./version";
 
 /** 유저 데이터 API 가드 — 공유 시크릿이 맞을 때만 통과 (우리 웹 서버만 호출) */
 function checkInternal(req: FastifyRequest, reply: FastifyReply): boolean {
@@ -57,7 +58,13 @@ export function buildApi(store: SqliteStore) {
     return payload;
   });
 
-  app.get("/health", async () => ({ ok: true, ts: new Date().toISOString() }));
+  // version = 지금 돌고 있는 커밋, startedAt = 서버 시작 시각 (자동 업데이트 확인용)
+  app.get("/health", async () => ({
+    ok: true,
+    ts: new Date().toISOString(),
+    version: VERSION,
+    startedAt: STARTED_AT,
+  }));
 
   // 현재 방송중 (+ VMOA 태그). ?tag=<id> 로 필터.
   app.get("/api/lives", async (req) => {
