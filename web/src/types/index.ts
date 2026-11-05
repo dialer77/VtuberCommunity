@@ -88,6 +88,31 @@ export interface RankingEntry {
   channelUrl: string;
 }
 
+export type RankingPeriod = "live" | "today" | "week" | "month";
+export type RankingMetric = "watch" | "avg" | "peak" | "hours";
+
+/** 기간 랭킹 아이템 (백엔드 일별 집계 합산) */
+export interface PeriodRankingEntry {
+  channelId: string;
+  channelName: string;
+  platform: Platform;
+  channelUrl: string;
+  watchHours: number;
+  avgViewers: number;
+  peakViewers: number;
+  liveHours: number;
+  days: number;
+  title: string | null;
+}
+
+export interface PeriodRanking {
+  /** 기간 시작일 (KST YYYY-MM-DD) */
+  since: string;
+  /** 집계를 시작한 날 — 기간보다 늦으면 아직 기간을 다 채우지 못한 것 */
+  trackingSince: string | null;
+  ranking: PeriodRankingEntry[];
+}
+
 /** 급상승 아이템 (윈도우 내 시청자 변화율) */
 export interface RisingEntry {
   channelId: string;

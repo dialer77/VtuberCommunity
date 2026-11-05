@@ -118,6 +118,31 @@ export interface RisingItem {
   channelUrl: string;
 }
 
+/** 기간 랭킹 아이템 (일별 집계 합산) */
+export interface PeriodRankingItem {
+  channelId: string;
+  channelName: string;
+  platform: Platform;
+  channelUrl: string;
+  /** 총 시청시간 = Σ(시청자 × 방송 분) / 60 */
+  watchHours: number;
+  /** 방송 중 평균 시청자 */
+  avgViewers: number;
+  peakViewers: number;
+  /** 방송한 시간 */
+  liveHours: number;
+  /** 방송한 날 수 */
+  days: number;
+  title: string | null;
+}
+
+export type RankingMetric = "watch" | "avg" | "peak" | "hours";
+
+/** KST 날짜 (YYYY-MM-DD) */
+function kstDate(ms: number): string {
+  return new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);
+}
+
 /** 이슈 출처 (기사·영상 등) + 미리보기 메타데이터 */
 export interface IssueSource {
   url: string;
@@ -259,6 +284,20 @@ export class SqliteStore implements Store {
       );
       CREATE INDEX IF NOT EXISTS idx_issue_sources_issue ON issue_sources(issue_id, position);
       CREATE INDEX IF NOT EXISTS idx_issue_sources_url ON issue_sources(url);
+
+      CREATE TABLE IF NOT EXISTS channel_daily (
+        date           TEXT NOT NULL,
+        channel_id     TEXT NOT NULL,
+        platform       TEXT NOT NULL,
+        name           TEXT NOT NULL,
+        live_minutes   REAL NOT NULL DEFAULT 0,
+        viewer_minutes REAL NOT NULL DEFAULT 0,
+        peak_viewers   INTEGER NOT NULL DEFAULT 0,
+        samples        INTEGER NOT NULL DEFAULT 0,
+        last_title     TEXT,
+        PRIMARY KEY (date, channel_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_daily_channel ON channel_daily(channel_id, date);
 
       CREATE TABLE IF NOT EXISTS app_meta (
         key   TEXT PRIMARY KEY,
@@ -725,6 +764,139 @@ export class SqliteStore implements Store {
       .sort((a, b) => b.growthPct - a.growthPct)
       .slice(0, limit)
       .map(({ samples: _samples, ...rest }) => rest);
+  }
+
+  // ---------------------------------------------------------------- 일별 집계 · 기간 랭킹
+
+  /**
+   * 한 수집 사이클을 일별 집계에 반영. minutes = 이 사이클이 대표하는 시간(분).
+   * 스냅샷은 보존 기간(7일) 뒤 지워지지만 일별 집계는 남아 주간·월간 랭킹의 원천이 된다.
+   */
+  recordDailyStats(snapshots: LiveSnapshot[], minutes: number): void {
+    if (snapshots.length === 0 || !(minutes > 0)) return;
+    // 같은 사이클에 같은 채널이 중복으로 잡히면(페이지 경계) 시청자 큰 쪽만
+    const byChannel = new Map<string, LiveSnapshot>();
+    for (const s of snapshots) {
+      const prev = byChannel.get(s.channelId);
+      if (!prev || s.viewers > prev.viewers) byChannel.set(s.channelId, s);
+    }
+    const stmt = this.db.prepare(`
+      INSERT INTO channel_daily (date, channel_id, platform, name, live_minutes, viewer_minutes, peak_viewers, samples, last_title)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
+      ON CONFLICT(date, channel_id) DO UPDATE SET
+        name = excluded.name,
+        live_minutes = live_minutes + excluded.live_minutes,
+        viewer_minutes = viewer_minutes + excluded.viewer_minutes,
+        peak_viewers = MAX(peak_viewers, excluded.peak_viewers),
+        samples = samples + 1,
+        last_title = excluded.last_title
+    `);
+    this.db.exec("BEGIN");
+    try {
+      for (const s of byChannel.values()) {
+        stmt.run(
+          kstDate(Date.parse(s.collectedAt)),
+          s.channelId,
+          s.platform,
+          s.channelName,
+          minutes,
+          s.viewers * minutes,
+          s.viewers,
+          s.title ?? null,
+        );
+      }
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+
+  /**
+   * 일별 집계가 비어 있으면 남아 있는 스냅샷(보존 기간 내)으로 한 번 채운다.
+   * 사이클 간격은 스냅샷 시각 차이로 계산하되 최대 maxGapMin (수집이 멈췄던 구간은 부풀리지 않음).
+   * 채운 사이클 수를 반환.
+   */
+  backfillDailyStats(pollMinutes: number, maxGapMin: number): number {
+    const has = this.db.prepare(`SELECT 1 FROM channel_daily LIMIT 1`).get();
+    if (has) return 0;
+    const batches = this.db
+      .prepare(`SELECT DISTINCT collected_at FROM live_snapshots ORDER BY collected_at`)
+      .all() as unknown as Array<{ collected_at: string }>;
+    if (batches.length === 0) return 0;
+    const rowsAt = this.db.prepare(`
+      SELECT channel_id, platform, channel_name, title, viewers FROM live_snapshots WHERE collected_at = ?
+    `);
+    let prev = 0;
+    for (const b of batches) {
+      const t = Date.parse(b.collected_at);
+      const minutes = prev ? Math.min((t - prev) / 60_000, maxGapMin) : pollMinutes;
+      prev = t;
+      const rows = rowsAt.all(b.collected_at) as unknown as Array<Record<string, unknown>>;
+      this.recordDailyStats(
+        rows.map((r) => ({
+          channelId: r.channel_id as string,
+          platform: r.platform as Platform,
+          channelName: r.channel_name as string,
+          title: (r.title as string | null) ?? "",
+          viewers: Number(r.viewers),
+          collectedAt: b.collected_at,
+        })) as unknown as LiveSnapshot[],
+        minutes,
+      );
+    }
+    return batches.length;
+  }
+
+  /** 기간 랭킹. days=1 이면 오늘(KST), 7 = 최근 7일, 30 = 최근 30일. */
+  getPeriodRanking(
+    days: number,
+    metric: RankingMetric,
+    limit = 50,
+  ): { since: string; trackingSince: string | null; ranking: PeriodRankingItem[] } {
+    const since = kstDate(Date.now() - (Math.max(1, days) - 1) * 86_400_000);
+    const rows = this.db
+      .prepare(`
+        SELECT cd.channel_id, cd.platform,
+          SUM(cd.live_minutes) AS lm, SUM(cd.viewer_minutes) AS vm,
+          MAX(cd.peak_viewers) AS pk, COUNT(*) AS d,
+          (SELECT name FROM channel_daily x WHERE x.channel_id = cd.channel_id ORDER BY date DESC LIMIT 1) AS name,
+          (SELECT last_title FROM channel_daily x WHERE x.channel_id = cd.channel_id ORDER BY date DESC LIMIT 1) AS title
+        FROM channel_daily cd
+        WHERE cd.date >= ?
+        GROUP BY cd.channel_id
+      `)
+      .all(since) as unknown as Array<Record<string, unknown>>;
+
+    const items: PeriodRankingItem[] = rows.map((r) => {
+      const lm = Number(r.lm ?? 0);
+      const vm = Number(r.vm ?? 0);
+      const platform = r.platform as Platform;
+      const channelId = r.channel_id as string;
+      return {
+        channelId,
+        channelName: r.name as string,
+        platform,
+        channelUrl: channelUrl(platform, channelId),
+        watchHours: vm / 60,
+        avgViewers: lm > 0 ? Math.round(vm / lm) : 0,
+        peakViewers: Number(r.pk ?? 0),
+        liveHours: lm / 60,
+        days: Number(r.d ?? 0),
+        title: (r.title as string | null) ?? null,
+      };
+    });
+    // 평균 시청자는 잠깐 켠 방송이 튀지 않게 1시간 이상 방송한 채널만
+    const pool = metric === "avg" ? items.filter((x) => x.liveHours >= 1) : items;
+    const key: Record<RankingMetric, (x: PeriodRankingItem) => number> = {
+      watch: (x) => x.watchHours,
+      avg: (x) => x.avgViewers,
+      peak: (x) => x.peakViewers,
+      hours: (x) => x.liveHours,
+    };
+    pool.sort((a, b) => key[metric](b) - key[metric](a));
+    const first = this.db.prepare(`SELECT MIN(date) AS d FROM channel_daily`).get() as { d: string | null };
+    return { since, trackingSince: first?.d ?? null, ranking: pool.slice(0, limit) };
   }
 
   // ---------------------------------------------------------------- 이슈

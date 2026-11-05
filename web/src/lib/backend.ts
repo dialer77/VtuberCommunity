@@ -11,6 +11,9 @@ import type {
   CoinSort,
   Issue,
   DebutWindow,
+  PeriodRanking,
+  RankingPeriod,
+  RankingMetric,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -163,6 +166,25 @@ export async function fetchDebutWindow(sinceIso: string, limit = 60): Promise<De
     confirmed: inRange.filter((d) => d.debutSignal),
     detected: detected.slice(0, limit),
     detectedTotal: detected.length,
+  };
+}
+
+/** 기간 랭킹 (오늘/주간/월간 × 시청시간/평균/최고/방송시간) */
+export async function fetchPeriodRanking(
+  period: Exclude<RankingPeriod, "live">,
+  metric: RankingMetric,
+  limit = 50,
+): Promise<PeriodRanking> {
+  const res = await fetch(
+    `${BASE}/api/ranking?period=${period}&metric=${metric}&limit=${limit}`,
+    fetchInit(),
+  );
+  if (!res.ok) throw new Error(`backend /api/ranking ${res.status}`);
+  const json = (await res.json()) as Partial<PeriodRanking>;
+  return {
+    since: json.since ?? "",
+    trackingSince: json.trackingSince ?? null,
+    ranking: json.ranking ?? [],
   };
 }
 

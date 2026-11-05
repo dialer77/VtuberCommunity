@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { SqliteStore, LiveItem, UserInfo } from "./store/sqlite";
+import type { SqliteStore, LiveItem, UserInfo, RankingMetric } from "./store/sqlite";
 import type { Platform } from "./domain";
 import {
   TAG_CATALOG,
@@ -148,9 +148,18 @@ export function buildApi(store: SqliteStore) {
     return issue;
   });
 
-  // 시청자 랭킹 (윈도우 내 평균)
+  // 시청자 랭킹.
+  //  ?period=today|week|month&metric=watch|avg|peak|hours → 일별 집계 기간 랭킹
+  //  ?window=180 → 최근 N분 평균 (실시간)
   app.get("/api/ranking", async (req) => {
-    const q = req.query as { window?: string; limit?: string };
+    const q = req.query as { window?: string; limit?: string; period?: string; metric?: string };
+    if (q.period) {
+      const days = q.period === "month" ? 30 : q.period === "week" ? 7 : 1;
+      const metric: RankingMetric =
+        q.metric === "avg" || q.metric === "peak" || q.metric === "hours" ? q.metric : "watch";
+      const r = store.getPeriodRanking(days, metric, Math.min(200, Number(q.limit) || 50));
+      return { period: q.period, metric, ...r, count: r.ranking.length };
+    }
     const ranking = store.getRanking(Number(q.window) || 180, Number(q.limit) || 30);
     return { count: ranking.length, ranking };
   });

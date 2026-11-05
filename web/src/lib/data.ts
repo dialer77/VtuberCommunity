@@ -8,12 +8,22 @@ import type {
 import { RAW_LIVES, RAW_DEBUTS } from "@/lib/mock";
 import { loadIssues, loadIssue } from "@/lib/issues";
 import { fetchChzzkLives } from "@/lib/chzzk";
-import type { TagCount, ChannelProfile, CoinItem, CoinSort, DebutWindow } from "@/types";
+import type {
+  TagCount,
+  ChannelProfile,
+  CoinItem,
+  CoinSort,
+  DebutWindow,
+  PeriodRanking,
+  RankingPeriod,
+  RankingMetric,
+} from "@/types";
 import {
   fetchLivesFromBackend,
   fetchDebutsFromBackend,
   fetchDebutWindow,
   fetchRankingFromBackend,
+  fetchPeriodRanking,
   fetchRisingFromBackend,
   fetchTags,
   fetchChannelProfile,
@@ -144,6 +154,18 @@ export async function getRanking(): Promise<RankingEntry[]> {
     title: l.title,
     channelUrl: l.channelUrl,
   }));
+}
+
+/** 기간 랭킹 — 백엔드 없으면 빈 목록 */
+export async function getPeriodRanking(
+  period: Exclude<RankingPeriod, "live">,
+  metric: RankingMetric,
+): Promise<PeriodRanking> {
+  try {
+    return await fetchPeriodRanking(period, metric);
+  } catch {
+    return { since: "", trackingSince: null, ranking: [] };
+  }
 }
 
 export async function getRising(): Promise<RisingEntry[]> {

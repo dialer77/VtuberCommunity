@@ -21,6 +21,13 @@ function makeStore(): Store {
 
 const store = makeStore();
 
+// 기간 랭킹용 일별 집계가 비어 있으면 남은 스냅샷으로 한 번 채움 (처음 배포 시)
+if (store instanceof SqliteStore) {
+  const pollMin = config.pollIntervalMs / 60_000;
+  const n = store.backfillDailyStats(pollMin, pollMin * 2);
+  if (n > 0) log.info(`일별 집계 백필: 스냅샷 ${n}사이클 반영`);
+}
+
 // REST API (읽기 라우트는 SqliteStore 기준)
 if (store instanceof SqliteStore) {
   const app = buildApi(store);

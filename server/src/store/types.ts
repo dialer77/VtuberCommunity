@@ -9,6 +9,9 @@ export interface Store {
    *  (= 신규 데뷔 후보 판정의 1차 신호) */
   markNewChannels(snapshots: LiveSnapshot[]): Promise<LiveSnapshot[]>;
 
+  /** 한 사이클을 일별 집계(기간 랭킹용)에 반영. minutes = 이 사이클이 대표하는 시간. (구현은 선택) */
+  recordDailyStats?(snapshots: LiveSnapshot[], minutes: number): void;
+
   /** 보존 기간을 넘긴 오래된 스냅샷 정리. 삭제 건수 반환. (구현은 선택) */
   pruneOldSnapshots?(retentionDays: number): Promise<number>;
 }

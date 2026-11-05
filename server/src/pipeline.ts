@@ -5,6 +5,9 @@ import type { LiveSnapshot } from "./domain";
 import { config } from "./config";
 import { log } from "./log";
 
+// 직전 사이클 시각 — 이번 사이클이 대표하는 시간(분)을 계산 (일별 집계용)
+let lastCycleMs = 0;
+
 /** 한 번의 폴링 사이클: COLLECT → NORMALIZE → STORE → DETECT */
 export async function runCycle(store: Store, cycle: number): Promise<void> {
   const collectedAt = new Date().toISOString();
@@ -33,6 +36,13 @@ export async function runCycle(store: Store, cycle: number): Promise<void> {
 
   // 3. STORE — 시계열 저장
   await store.saveSnapshots(snapshots);
+
+  // 3-1. 일별 집계 (기간 랭킹). 사이클 간격은 실제 경과 시간, 단 수집이 멈췄던 구간은 부풀리지 않게 상한
+  const nowMs = Date.parse(collectedAt);
+  const pollMin = config.pollIntervalMs / 60_000;
+  const minutes = lastCycleMs ? Math.min((nowMs - lastCycleMs) / 60_000, pollMin * 2) : pollMin;
+  lastCycleMs = nowMs;
+  store.recordDailyStats?.(snapshots, minutes);
 
   // 4. DETECT — 신규 채널(first-seen) = 데뷔 후보
   const newly = await store.markNewChannels(snapshots);
