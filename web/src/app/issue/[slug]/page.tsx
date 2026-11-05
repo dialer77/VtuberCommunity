@@ -5,7 +5,7 @@ import { getIssueBySlug } from "@/lib/data";
 import { formatDate, issueDate } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
 import { AdSlot } from "@/components/ad-slot";
-import { SourceCard, YouTubeEmbed, pickCover } from "@/components/source-card";
+import { SourceCard, VideoCover, pickCover } from "@/components/source-card";
 
 const SITE_URL = process.env.SITE_URL ?? "http://localhost:3000";
 
@@ -77,7 +77,7 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
       {/* 대표 자료: 영상이면 바로 재생, 기사면 미리보기 카드 */}
       {cover ? (
         cover.kind === "youtube" && cover.embedId ? (
-          <YouTubeEmbed id={cover.embedId} title={cover.title} />
+          <VideoCover source={cover} />
         ) : (
           <SourceCard source={cover} size="lg" />
         )

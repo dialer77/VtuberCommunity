@@ -1,6 +1,7 @@
 import type { IssueSource } from "@/types";
 import { formatDate } from "@/lib/format";
 import { RemoteImage } from "@/components/remote-image";
+import { PlayVideo } from "@/components/player/play-video";
 
 function domainOf(url: string): string {
   try {
@@ -50,13 +51,10 @@ export function SourceCard({ source, size = "md" }: { source: IssueSource; size?
     );
   }
 
-  return (
-    <a
-      href={source.url}
-      target="_blank"
-      rel="noopener noreferrer nofollow"
-      className="group flex items-stretch gap-3 overflow-hidden rounded-xl border border-border bg-surface p-2.5 transition-colors hover:border-accent/60"
-    >
+  const cardClass =
+    "group flex w-full items-stretch gap-3 overflow-hidden rounded-xl border border-border bg-surface p-2.5 transition-colors hover:border-accent/60";
+  const inner = (
+    <>
       <div className="relative w-28 sm:w-36 shrink-0 aspect-video overflow-hidden rounded-lg bg-surface-2 flex items-center justify-center text-2xl text-foreground/20">
         <span aria-hidden>{icon}</span>
         {source.imageUrl ? (
@@ -68,26 +66,46 @@ export function SourceCard({ source, size = "md" }: { source: IssueSource; size?
         <span className="text-sm font-semibold leading-snug line-clamp-2 group-hover:text-accent transition-colors">
           {source.title}
         </span>
-        <span className="text-xs text-muted-2 truncate">{domainOf(source.url)} ↗</span>
+        <span className="text-xs text-muted-2 truncate">
+          {source.kind === "youtube" && source.embedId ? "▶ 여기서 재생" : `${domainOf(source.url)} ↗`}
+        </span>
       </div>
+    </>
+  );
+  if (source.kind === "youtube" && source.embedId) {
+    return (
+      <PlayVideo video={{ id: source.embedId, title: source.title, channel: source.publisher }} className={cardClass}>
+        {inner}
+      </PlayVideo>
+    );
+  }
+  return (
+    <a href={source.url} target="_blank" rel="noopener noreferrer nofollow" className={cardClass}>
+      {inner}
     </a>
   );
 }
 
-/** 유튜브 영상 임베드 (개인정보 보호 모드 도메인) */
-export function YouTubeEmbed({ id, title }: { id: string; title: string }) {
+/** 유튜브 대표 영상: 큰 썸네일 → 누르면 사이트 안 플레이어로 재생 */
+export function VideoCover({ source }: { source: IssueSource }) {
+  if (!source.embedId) return null;
   return (
-    <div className="relative aspect-video overflow-hidden rounded-xl border border-border bg-black">
-      <iframe
-        src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}`}
-        title={title}
-        loading="lazy"
-        allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        referrerPolicy="strict-origin-when-cross-origin"
-        allowFullScreen
-        className="absolute inset-0 h-full w-full"
-      />
-    </div>
+    <PlayVideo
+      video={{ id: source.embedId, title: source.title, channel: source.publisher }}
+      className="group relative block w-full aspect-video overflow-hidden rounded-xl border border-border bg-black"
+    >
+      {source.imageUrl ? (
+        <RemoteImage src={source.imageUrl} className="absolute inset-0 h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100" />
+      ) : null}
+      <span className="absolute inset-0 flex items-center justify-center">
+        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/60 text-3xl text-white shadow-lg transition-transform group-hover:scale-110">
+          ▶
+        </span>
+      </span>
+      <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-3 pt-8 text-left text-sm font-semibold text-white line-clamp-2">
+        {source.title}
+      </span>
+    </PlayVideo>
   );
 }
 

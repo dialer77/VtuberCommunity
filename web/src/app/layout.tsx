@@ -5,6 +5,7 @@ import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { PlayerProvider } from "@/components/player/player-provider";
 
 const SITE_URL = process.env.SITE_URL ?? "http://localhost:3000";
 const ADSENSE_CLIENT = process.env.NEXT_PUBLIC_ADSENSE_CLIENT;
@@ -77,11 +78,14 @@ export default function RootLayout({
             src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
           />
         ) : null}
-        <SiteHeader />
-        <main className="flex-1 w-full max-w-6xl mx-auto px-5 py-8">
-          {children}
-        </main>
-        <SiteFooter />
+        {/* 전역 유튜브 플레이어 — 페이지를 옮겨도 재생이 이어진다 */}
+        <PlayerProvider>
+          <SiteHeader />
+          <main className="flex-1 w-full max-w-6xl mx-auto px-5 py-8">
+            {children}
+          </main>
+          <SiteFooter />
+        </PlayerProvider>
       </body>
     </html>
   );
