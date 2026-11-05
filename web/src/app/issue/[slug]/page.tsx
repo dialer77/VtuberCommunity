@@ -74,14 +74,8 @@ export default async function IssueDetailPage({ params }: { params: Params }) {
         <p className="text-muted">{issue.summary}</p>
       </header>
 
-      {/* 대표 자료: 영상이면 바로 재생, 기사면 미리보기 카드 */}
-      {cover ? (
-        cover.kind === "youtube" && cover.embedId ? (
-          <VideoCover source={cover} />
-        ) : (
-          <SourceCard source={cover} size="lg" />
-        )
-      ) : null}
+      {/* 대표 자료: 유튜브 영상이 있으면 사이트 안에서 재생 (기사는 아래 출처 링크로) */}
+      {cover ? <VideoCover source={cover} /> : null}
 
       <script
         type="application/ld+json"

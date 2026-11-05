@@ -117,24 +117,17 @@ export async function enrichSource(
   };
   const page = await fetchHtml(base.url, timeoutMs);
   if (!page) return src;
-  const { html, finalUrl } = page;
+  const { html } = page;
   const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
   const title = meta(html, ["og:title", "twitter:title"]) ?? (titleTag ? decodeEntities(titleTag) : null);
-  const image = meta(html, ["og:image:secure_url", "og:image", "twitter:image", "twitter:image:src"]);
-  let imageUrl = src.imageUrl;
-  if (!imageUrl && image) {
-    try {
-      imageUrl = new URL(image, finalUrl).toString();
-    } catch {
-      imageUrl = null;
-    }
-  }
+  // 기사는 링크·출처로만 쓴다 — 대표 이미지(보도사진)와 요약문은 저장·표시하지 않음 (저작권 분쟁 방지).
+  // 유튜브는 공식 썸네일(i.ytimg.com)과 임베드 재생이 약관상 허용되므로 그대로.
   return {
     ...src,
     title: title || src.title,
     publisher: meta(html, ["og:site_name", "application-name"]) ?? src.publisher,
-    description: meta(html, ["og:description", "twitter:description", "description"]),
-    imageUrl: imageUrl && /^https?:\/\//.test(imageUrl) ? imageUrl : null,
+    description: null,
+    imageUrl: src.imageUrl,
     publishedAt:
       meta(html, ["article:published_time", "og:article:published_time", "pubdate", "date"]) ?? src.publishedAt,
   };

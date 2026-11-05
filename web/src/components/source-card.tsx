@@ -17,39 +17,14 @@ function sourceDate(s: IssueSource): string | null {
   return Number.isNaN(t) ? null : formatDate(new Date(t).toISOString());
 }
 
-/** 기사·자료 미리보기 카드. lg = 본문 위 대표 자료, md = 출처 목록 */
-export function SourceCard({ source, size = "md" }: { source: IssueSource; size?: "md" | "lg" }) {
+/**
+ * 출처 카드. 기사는 링크·출처로만(제목·언론사·날짜) — 보도사진·요약문은 표시하지 않는다.
+ * 유튜브는 공식 썸네일 + 사이트 안에서 재생.
+ */
+export function SourceCard({ source }: { source: IssueSource }) {
   const meta = [source.publisher ?? domainOf(source.url), sourceDate(source)].filter(Boolean).join(" · ");
-  const icon = source.kind === "youtube" ? "▶" : "📰";
-
-  if (size === "lg") {
-    return (
-      <a
-        href={source.url}
-        target="_blank"
-        rel="noopener noreferrer nofollow"
-        className="group block overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-accent/60"
-      >
-        {source.imageUrl ? (
-          <div className="relative aspect-[1.91/1] bg-surface-2">
-            <RemoteImage src={source.imageUrl} className="absolute inset-0 h-full w-full object-cover" />
-          </div>
-        ) : null}
-        <div className="flex flex-col gap-1 p-4">
-          <span className="text-xs text-muted-2">
-            {icon} {meta}
-          </span>
-          <span className="font-semibold leading-snug group-hover:text-accent transition-colors line-clamp-2">
-            {source.title}
-          </span>
-          {source.description ? (
-            <span className="text-sm text-muted line-clamp-2">{source.description}</span>
-          ) : null}
-          <span className="text-xs text-accent mt-1">원문 보기 ↗</span>
-        </div>
-      </a>
-    );
-  }
+  const isVideo = source.kind === "youtube" && !!source.embedId;
+  const icon = isVideo ? "▶" : "📰";
 
   const cardClass =
     "group flex w-full items-stretch gap-3 overflow-hidden rounded-xl border border-border bg-surface p-2.5 transition-colors hover:border-accent/60";
@@ -57,7 +32,7 @@ export function SourceCard({ source, size = "md" }: { source: IssueSource; size?
     <>
       <div className="relative w-28 sm:w-36 shrink-0 aspect-video overflow-hidden rounded-lg bg-surface-2 flex items-center justify-center text-2xl text-foreground/20">
         <span aria-hidden>{icon}</span>
-        {source.imageUrl ? (
+        {isVideo && source.imageUrl ? (
           <RemoteImage src={source.imageUrl} className="absolute inset-0 h-full w-full object-cover" />
         ) : null}
       </div>
@@ -67,12 +42,12 @@ export function SourceCard({ source, size = "md" }: { source: IssueSource; size?
           {source.title}
         </span>
         <span className="text-xs text-muted-2 truncate">
-          {source.kind === "youtube" && source.embedId ? "▶ 여기서 재생" : `${domainOf(source.url)} ↗`}
+          {isVideo ? "▶ 여기서 재생" : `원문 보기 · ${domainOf(source.url)} ↗`}
         </span>
       </div>
     </>
   );
-  if (source.kind === "youtube" && source.embedId) {
+  if (isVideo && source.embedId) {
     return (
       <PlayVideo video={{ id: source.embedId, title: source.title, channel: source.publisher }} className={cardClass}>
         {inner}
@@ -109,11 +84,7 @@ export function VideoCover({ source }: { source: IssueSource }) {
   );
 }
 
-/** 이슈 대표 자료: 유튜브가 있으면 영상, 아니면 이미지가 있는 첫 기사 */
+/** 이슈 대표 자료: 유튜브 영상만 (기사는 링크·출처로만 쓰므로 대표 이미지로 쓰지 않음) */
 export function pickCover(sources: IssueSource[]): IssueSource | null {
-  return (
-    sources.find((s) => s.kind === "youtube" && s.embedId) ??
-    sources.find((s) => s.imageUrl) ??
-    null
-  );
+  return sources.find((s) => s.kind === "youtube" && !!s.embedId) ?? null;
 }
