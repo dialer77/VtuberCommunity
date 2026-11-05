@@ -1,4 +1,6 @@
 import { collectors } from "./collectors";
+import { fetchRegistryLives } from "./collectors/registry";
+import { setRegistryAllowlist } from "./vtuber";
 import { debutCandidates, hasDebutSignal } from "./detect/debut";
 import type { Store } from "./store/types";
 import type { LiveSnapshot } from "./domain";
@@ -11,6 +13,10 @@ let lastCycleMs = 0;
 /** 한 번의 폴링 사이클: COLLECT → NORMALIZE → STORE → DETECT */
 export async function runCycle(store: Store, cycle: number): Promise<void> {
   const collectedAt = new Date().toISOString();
+
+  // 0. 버튜버 확정 목록 갱신 (태그가 없어도 버튜버로 인정)
+  const registry = store.listRegistry?.() ?? [];
+  setRegistryAllowlist(registry.map((r) => r.channelId));
 
   // 1. COLLECT — 모든 수집기에서 병렬 수집 (하나 실패해도 나머지는 진행)
   const results = await Promise.allSettled(
@@ -33,6 +39,14 @@ export async function runCycle(store: Store, cycle: number): Promise<void> {
       log.error(`수집 실패 [${collectors[i]?.platform}]: ${res.reason}`);
     }
   });
+
+  // 1-1. 확정 채널 중 이번 목록에 없던 채널은 직접 확인 (순위 밖·다른 카테고리)
+  if (registry.length > 0) {
+    const seen = new Set(snapshots.map((s) => s.channelId));
+    const extra = await fetchRegistryLives(registry, seen);
+    for (const x of extra) snapshots.push({ ...x.live, platform: x.platform, collectedAt });
+    if (extra.length > 0) log.info(`  확정 채널 직접 확인으로 ${extra.length}건 추가`);
+  }
 
   // 3. STORE — 시계열 저장
   await store.saveSnapshots(snapshots);

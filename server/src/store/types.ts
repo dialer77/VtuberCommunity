@@ -1,4 +1,5 @@
 import type { LiveSnapshot } from "../domain";
+import type { RegistryEntry } from "./sqlite";
 
 /** 저장소 공통 인터페이스. sqlite ↔ memory ↔ postgres 를 갈아끼울 수 있게 추상화. */
 export interface Store {
@@ -11,6 +12,9 @@ export interface Store {
 
   /** 한 사이클을 일별 집계(기간 랭킹용)에 반영. minutes = 이 사이클이 대표하는 시간. (구현은 선택) */
   recordDailyStats?(snapshots: LiveSnapshot[], minutes: number): void;
+
+  /** 버튜버 확정 목록 (태그 없어도 인정 + 순위 밖이어도 방송 직접 확인). (구현은 선택) */
+  listRegistry?(): RegistryEntry[];
 
   /** 보존 기간을 넘긴 오래된 스냅샷 정리. 삭제 건수 반환. (구현은 선택) */
   pruneOldSnapshots?(retentionDays: number): Promise<number>;

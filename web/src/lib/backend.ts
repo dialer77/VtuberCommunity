@@ -11,6 +11,8 @@ import type {
   CoinSort,
   Issue,
   DebutWindow,
+  DebutSource,
+  DebutReportEntry,
   PeriodRanking,
   RankingPeriod,
   RankingMetric,
@@ -47,6 +49,11 @@ interface BackendDebut {
   title: string | null;
   debutSignal: boolean;
   channelUrl: string;
+  debutAt?: string;
+  web?: boolean;
+  agency?: string | null;
+  summary?: string | null;
+  sources?: DebutSource[];
 }
 
 export async function fetchLivesFromBackend(
@@ -123,11 +130,14 @@ function toDebutEvent(d: BackendDebut): DebutEvent {
     id: d.channelId,
     vtuberName: d.channelName,
     platform: d.platform,
-    debutAt: d.firstSeenAt,
-    agency: null,
+    debutAt: d.debutAt ?? d.firstSeenAt,
+    agency: d.agency ?? null,
     note: d.title,
     debutSignal: d.debutSignal,
     channelUrl: d.channelUrl,
+    web: d.web ?? false,
+    summary: d.summary ?? null,
+    sources: d.sources ?? [],
   };
 }
 
@@ -151,12 +161,16 @@ export async function fetchDebutWindow(sinceIso: string, limit = 60): Promise<De
     detected?: BackendDebut[];
     detectedTotal?: number;
     debuts?: BackendDebut[];
+    upcoming?: DebutReportEntry[];
+    webOnly?: DebutReportEntry[];
   };
   if (json.confirmed) {
     return {
       confirmed: json.confirmed.map(toDebutEvent),
       detected: (json.detected ?? []).map(toDebutEvent),
       detectedTotal: json.detectedTotal ?? 0,
+      upcoming: json.upcoming ?? [],
+      webOnly: json.webOnly ?? [],
     };
   }
   // 이전 백엔드(since 미지원) 호환 — 받은 목록을 기간으로 걸러 나눈다
@@ -166,6 +180,8 @@ export async function fetchDebutWindow(sinceIso: string, limit = 60): Promise<De
     confirmed: inRange.filter((d) => d.debutSignal),
     detected: detected.slice(0, limit),
     detectedTotal: detected.length,
+    upcoming: [],
+    webOnly: [],
   };
 }
 

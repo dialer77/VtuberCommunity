@@ -61,6 +61,31 @@ export interface DebutWindow {
   confirmed: DebutEvent[];
   detected: DebutEvent[];
   detectedTotal: number;
+  /** 웹에서 찾은 데뷔 예정 (기간과 무관하게 앞으로 데뷔할 버튜버) */
+  upcoming: DebutReportEntry[];
+  /** 기간 안에 데뷔했지만 우리 수집기가 감지하지 못한 버튜버 (웹 소식) */
+  webOnly: DebutReportEntry[];
+}
+
+export interface DebutSource {
+  url: string;
+  title: string;
+  publisher: string | null;
+}
+
+/** 웹에서 수집한 데뷔 소식 */
+export interface DebutReportEntry {
+  id: number;
+  name: string;
+  agency: string | null;
+  platform: Platform | null;
+  channelId: string | null;
+  channelUrl: string | null;
+  debutAt: string;
+  debutDate: string;
+  status: "upcoming" | "debuted";
+  summary: string | null;
+  sources: DebutSource[];
 }
 
 export interface DebutEvent {
@@ -74,6 +99,10 @@ export interface DebutEvent {
   /** 제목에 데뷔 키워드가 있어 "진짜 데뷔"로 추정되는지 */
   debutSignal: boolean;
   channelUrl: string | null;
+  /** 웹 데뷔 소식으로도 확인됨 */
+  web?: boolean;
+  summary?: string | null;
+  sources?: DebutSource[];
 }
 
 /** 랭킹 아이템 (윈도우 내 평균/피크 시청자) */

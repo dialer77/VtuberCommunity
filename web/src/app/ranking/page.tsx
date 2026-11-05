@@ -5,7 +5,7 @@ import { getRanking, getRising, getPeriodRanking } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { PlatformBadge } from "@/components/platform-badge";
 import { Avatar } from "@/components/avatar";
-import { formatCount } from "@/lib/format";
+import { formatCount, formatYmd } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "랭킹",
@@ -203,7 +203,7 @@ async function PeriodRankingList({
       <Tabs items={METRICS} active={metric} link={(m) => href(period, m)} small />
       {partial ? (
         <p className="text-xs text-muted-2">
-          {trackingSince?.slice(5).replace("-", "월 ")}일부터 집계를 시작해 아직 기간을 다 채우지 못했어요.
+          {trackingSince ? formatYmd(trackingSince) : ""}부터 집계를 시작해 아직 기간을 다 채우지 못했어요.
         </p>
       ) : null}
       {metric === "avg" ? (

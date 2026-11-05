@@ -29,6 +29,12 @@ export const config = {
   issuesIntervalMin: Number(process.env.ISSUES_INTERVAL_MIN ?? 180),
   /** 한 번에 올릴 최대 이슈 수 */
   issuesMaxPerRun: Number(process.env.ISSUES_MAX_PER_RUN ?? 5),
+  /** 신규 데뷔 웹 수집 (기본: 이슈 수집과 같이 켜짐) */
+  debutsEnabled: (process.env.DEBUTS_ENABLED ?? process.env.ISSUES_ENABLED) === "1",
+  /** 데뷔 수집 주기(분). 기본 6시간 */
+  debutsIntervalMin: Number(process.env.DEBUTS_INTERVAL_MIN ?? 360),
+  /** 한 번에 받을 최대 데뷔 소식 수 */
+  debutsMaxPerRun: Number(process.env.DEBUTS_MAX_PER_RUN ?? 15),
   /** claude 실행 파일 경로 (비우면 자동 탐색) */
   claudeBin: process.env.CLAUDE_BIN ?? "",
   /** 사용할 모델 (비우면 구독 계정 기본값) */

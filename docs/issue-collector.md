@@ -1,8 +1,10 @@
-# 이슈 자동 수집 — Claude 구독으로 3시간마다 정리
+# Claude 자동 수집 — 이슈(3시간) · 신규 데뷔(6시간)
 
-> 백엔드(`server/`)가 3시간마다 **Claude Code 를 헤드리스로 실행**해 웹을 검색하고,
-> 한국 버튜버 씬 이슈를 **출처와 함께** 정리해 DB 에 올린다. 웹 `/issue` 에 바로 반영된다.
-> 인증은 **Claude 구독(Pro/Max)** — API 키·종량 과금 없음.
+> 백엔드(`server/`)가 **Claude Code 를 헤드리스로 실행**해 웹을 검색하고 DB 에 올린다. 인증은 **Claude 구독(Pro/Max)** — API 키·종량 과금 없음.
+> - **이슈** (3시간마다): 한국 버튜버 씬 이슈를 출처와 함께 정리 → 웹 `/issue`
+> - **신규 데뷔** (6시간마다): 최근 30일 데뷔 + 60일 안 데뷔 예정 소식을 출처와 함께 수집 → 웹 `/debut`
+>   채널 주소가 확인되면 **버튜버 확정 목록**에 넣어, 방송 태그가 없거나 시청자 순위 밖이어도 그 채널의 방송을 매분 직접 확인한다.
+> - 두 작업은 동시에 돌지 않는다 (같은 구독 사용량을 나눠 씀).
 
 ## 동작 방식
 
@@ -55,6 +57,10 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\setup-issues.ps1
 | `deploy\windows\issues.ps1 hide <slug>` | 사이트에서 **즉시 숨김** (잘못 정리된 글) |
 | `deploy\windows\issues.ps1 show <slug>` | 다시 공개 |
 | `deploy\windows\issues.ps1 run [시간]` | 지금 바로 수집 (기본: 마지막 실행 이후 분량) |
+| `deploy\windows\issues.ps1 debuts-run` | 지금 바로 신규 데뷔 소식 수집 |
+| `deploy\windows\issues.ps1 debuts-list [개수]` | 데뷔 소식 목록 (번호 확인용, 숨김 포함) |
+| `deploy\windows\issues.ps1 debuts-hide <번호>` / `debuts-show <번호>` | 데뷔 소식 숨김 / 다시 공개 |
+| `deploy\windows\issues.ps1 registry-list` | 버튜버 확정 목록 (직접 방송 확인 대상) |
 | `deploy\windows\setup-issues.ps1 -Disable` | 자동 수집 끄기 |
 | `deploy\windows\setup-issues.ps1 -RenewToken` | 토큰 재발급 (만료·계정 변경 시) |
 
@@ -69,6 +75,9 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\setup-issues.ps1
 | `ISSUES_ENABLED` | `0` | `1` 이면 자동 수집 |
 | `ISSUES_INTERVAL_MIN` | `180` | 수집 주기(분) |
 | `ISSUES_MAX_PER_RUN` | `5` | 한 번에 올릴 최대 이슈 수 |
+| `DEBUTS_ENABLED` | (`ISSUES_ENABLED` 따름) | `1` 이면 신규 데뷔 웹 수집 |
+| `DEBUTS_INTERVAL_MIN` | `360` | 데뷔 수집 주기(분) |
+| `DEBUTS_MAX_PER_RUN` | `15` | 1회 최대 데뷔 소식 수 |
 | `CLAUDE_BIN` | (자동 탐색) | claude.exe 절대 경로 — 배포 PC 에선 필수 (setup-issues 가 기록) |
 | `CLAUDE_CODE_OAUTH_TOKEN` | — | 구독 토큰 (`claude setup-token`) |
 | `CLAUDE_MODEL` | (계정 기본) | 모델 고정이 필요할 때 (예: `opus`, `sonnet`) |

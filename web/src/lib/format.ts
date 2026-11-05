@@ -48,6 +48,19 @@ export function debutCountdown(iso: string): string {
   return `${-days}일 전`;
 }
 
+/** 데뷔 일시 — 시각을 모르는 경우(KST 자정)는 날짜만 */
+export function formatDebutDate(iso: string): string {
+  const kst = new Date(new Date(iso).getTime() + 9 * 3_600_000);
+  const midnight = kst.getUTCHours() === 0 && kst.getUTCMinutes() === 0;
+  return midnight ? formatDate(iso) : formatDateTime(iso);
+}
+
+/** "2026-11-05" → "11월 5일" */
+export function formatYmd(ymd: string): string {
+  const [, m, d] = ymd.split("-").map(Number);
+  return `${m}월 ${d}일`;
+}
+
 /** 이슈의 기준 시각: 사건 날짜(KST 자정) → 없으면 게시 시각 */
 export function issueDate(issue: { eventDate: string | null; publishedAt: string }): string {
   return issue.eventDate ? `${issue.eventDate}T00:00:00+09:00` : issue.publishedAt;

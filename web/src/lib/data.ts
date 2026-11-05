@@ -119,7 +119,13 @@ export async function getDebutWindow(sinceIso: string): Promise<DebutWindow> {
   }
   const inRange = mockDebutEvents().filter((d) => d.debutAt >= sinceIso);
   const detected = inRange.filter((d) => !d.debutSignal);
-  return { confirmed: inRange.filter((d) => d.debutSignal), detected, detectedTotal: detected.length };
+  return {
+    confirmed: inRange.filter((d) => d.debutSignal),
+    detected,
+    detectedTotal: detected.length,
+    upcoming: [],
+    webOnly: [],
+  };
 }
 
 function mockDebutEvents(): DebutEvent[] {

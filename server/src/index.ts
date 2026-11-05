@@ -6,7 +6,7 @@ import { MemoryStore } from "./store/memory";
 import { PostgresStore } from "./store/postgres";
 import type { Store } from "./store/types";
 import { log } from "./log";
-import { startIssueScheduler } from "./issues/scheduler";
+import { startAiJobs } from "./issues/scheduler";
 
 function makeStore(): Store {
   switch (config.storeKind) {
@@ -35,8 +35,8 @@ if (store instanceof SqliteStore) {
   log.info(
     `API http://localhost:${config.apiPort}  (/health, /api/lives, /api/debuts, /api/issues)`,
   );
-  // 이슈 자동 수집 (ISSUES_ENABLED=1 일 때만)
-  startIssueScheduler(store);
+  // Claude 자동 수집 — 이슈 3시간 · 신규 데뷔 6시간 (ISSUES_ENABLED=1 일 때만)
+  startAiJobs(store);
 }
 
 // 수집 스케줄러

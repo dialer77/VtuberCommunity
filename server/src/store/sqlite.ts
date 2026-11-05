@@ -30,6 +30,47 @@ export interface DebutItem {
   /** 첫 관측 시 제목에 데뷔 키워드가 있었는지 (진짜 데뷔 추정) */
   debutSignal: boolean;
   channelUrl: string;
+  /** 데뷔일 — 웹 소식이 있으면 그 날짜, 없으면 처음 감지된 시각 */
+  debutAt: string;
+  /** 웹 데뷔 소식으로 확인됨 (아래 정보는 그 소식에서) */
+  web?: boolean;
+  agency?: string | null;
+  summary?: string | null;
+  sources?: DebutSource[];
+}
+
+/** 웹 데뷔 소식의 출처 */
+export interface DebutSource {
+  url: string;
+  title: string;
+  publisher: string | null;
+}
+
+/** 웹에서 수집한 데뷔 소식 (예정 포함) */
+export interface DebutReport {
+  id: number;
+  name: string;
+  agency: string | null;
+  platform: Platform | null;
+  channelId: string | null;
+  channelUrl: string | null;
+  /** 데뷔 일시 (ISO). 시간을 모르면 KST 자정 */
+  debutAt: string;
+  /** KST 날짜 */
+  debutDate: string;
+  status: "upcoming" | "debuted";
+  summary: string | null;
+  sources: DebutSource[];
+  hidden: boolean;
+}
+
+export type NewDebutReport = Omit<DebutReport, "id" | "hidden">;
+
+/** 버튜버 확정 목록 (태그가 없어도 버튜버로 인정 + 순위 밖이어도 방송 직접 확인) */
+export interface RegistryEntry {
+  platform: Platform;
+  channelId: string;
+  name: string;
 }
 
 /** 한 번의 방송 세션 (started_at 으로 그룹핑한 스냅샷) */
@@ -298,6 +339,34 @@ export class SqliteStore implements Store {
         PRIMARY KEY (date, channel_id)
       );
       CREATE INDEX IF NOT EXISTS idx_daily_channel ON channel_daily(channel_id, date);
+
+      CREATE TABLE IF NOT EXISTS debut_reports (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        name        TEXT NOT NULL,
+        agency      TEXT,
+        platform    TEXT,
+        channel_id  TEXT,
+        channel_url TEXT,
+        debut_at    TEXT NOT NULL,
+        debut_date  TEXT NOT NULL,
+        status      TEXT NOT NULL,
+        summary     TEXT,
+        sources     TEXT NOT NULL,
+        found_at    TEXT NOT NULL,
+        updated_at  TEXT NOT NULL,
+        hidden      INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_debut_reports_date ON debut_reports(debut_date);
+      CREATE INDEX IF NOT EXISTS idx_debut_reports_channel ON debut_reports(channel_id);
+
+      CREATE TABLE IF NOT EXISTS vtuber_registry (
+        platform   TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        name       TEXT NOT NULL,
+        source     TEXT NOT NULL,
+        added_at   TEXT NOT NULL,
+        PRIMARY KEY (platform, channel_id)
+      );
 
       CREATE TABLE IF NOT EXISTS app_meta (
         key   TEXT PRIMARY KEY,
@@ -594,6 +663,7 @@ export class SqliteStore implements Store {
         title: (r.title as string | null) ?? null,
         debutSignal: Number(r.debut_signal) === 1,
         channelUrl: channelUrl(platform, channelId),
+        debutAt: r.first_seen_at as string,
       };
     });
   }
@@ -605,8 +675,21 @@ export class SqliteStore implements Store {
   getDebutsSince(
     sinceIso: string,
     detectedLimit = 60,
-  ): { confirmed: DebutItem[]; detected: DebutItem[]; detectedTotal: number } {
-    const select = `
+  ): {
+    confirmed: DebutItem[];
+    detected: DebutItem[];
+    detectedTotal: number;
+    upcoming: DebutReport[];
+    webOnly: DebutReport[];
+  } {
+    // 웹 데뷔 소식 (숨김 제외) — 채널과 이어진 것은 '데뷔 확인'으로 올리고 출처를 붙인다
+    const reports = this.listDebutReports();
+    const byChannel = new Map<string, DebutReport>();
+    for (const r of reports) if (r.channelId) byChannel.set(r.channelId, r);
+    const webIds = [...byChannel.keys()];
+    const inWeb = webIds.length ? `c.channel_id IN (${webIds.map(() => "?").join(",")})` : "0";
+
+    const select = (where: string) => `
       SELECT c.channel_id, c.platform, c.name, c.first_seen_at, c.debut_signal,
         COALESCE(
           (SELECT title FROM live_snapshots s
@@ -614,11 +697,12 @@ export class SqliteStore implements Store {
           c.first_title
         ) AS title
       FROM channels c
-      WHERE c.first_seen_at >= ? AND c.debut_signal = ?
+      WHERE ${where}
       ORDER BY c.first_seen_at DESC`;
     const map = (r: Record<string, unknown>): DebutItem => {
       const platform = r.platform as Platform;
       const channelId = r.channel_id as string;
+      const rep = byChannel.get(channelId);
       return {
         channelId,
         channelName: r.name as string,
@@ -627,16 +711,157 @@ export class SqliteStore implements Store {
         title: (r.title as string | null) ?? null,
         debutSignal: Number(r.debut_signal) === 1,
         channelUrl: channelUrl(platform, channelId),
+        // 수집이 멈췄던 기간 등으로 '처음 감지'가 실제 데뷔보다 늦을 수 있어, 웹 소식의 데뷔일을 우선
+        debutAt: rep?.debutAt ?? (r.first_seen_at as string),
+        ...(rep
+          ? { web: true, agency: rep.agency, summary: rep.summary, sources: rep.sources }
+          : {}),
       };
     };
-    const confirmed = (this.db.prepare(select).all(sinceIso, 1) as unknown as Array<Record<string, unknown>>).map(map);
+    type Rows = Array<Record<string, unknown>>;
+    // 데뷔 확인: 데뷔 키워드로 감지된 채널(감지일이 기간 안) + 웹 소식과 이어진 채널(데뷔일로 기간 판단)
+    const nowIso = new Date().toISOString();
+    const confirmed = (
+      this.db
+        .prepare(select(`((c.debut_signal = 1 AND c.first_seen_at >= ?) OR ${inWeb})`))
+        .all(sinceIso, ...webIds) as unknown as Rows
+    )
+      .map(map)
+      .filter((d) => d.debutAt >= sinceIso && d.debutAt <= nowIso)
+      .sort((a, b) => b.debutAt.localeCompare(a.debutAt));
+    const detectedWhere = `c.debut_signal = 0 AND NOT ${inWeb}`;
     const detected = (
-      this.db.prepare(`${select} LIMIT ?`).all(sinceIso, 0, detectedLimit) as unknown as Array<Record<string, unknown>>
+      this.db
+        .prepare(`${select(`c.first_seen_at >= ? AND ${detectedWhere}`)} LIMIT ?`)
+        .all(sinceIso, ...webIds, detectedLimit) as unknown as Rows
     ).map(map);
     const total = this.db
-      .prepare(`SELECT COUNT(*) AS n FROM channels WHERE first_seen_at >= ? AND debut_signal = 0`)
-      .get(sinceIso) as { n: number };
-    return { confirmed, detected, detectedTotal: Number(total.n) };
+      .prepare(`SELECT COUNT(*) AS n FROM channels c WHERE c.first_seen_at >= ? AND ${detectedWhere}`)
+      .get(sinceIso, ...webIds) as { n: number };
+
+    // 예정: 오늘 이후 (기간과 무관하게 항상) / 웹 단독: 기간 안에 데뷔했는데 우리가 감지 못한 채널
+    const today = kstDate(Date.now());
+    const sinceDate = kstDate(Date.parse(sinceIso));
+    const known = new Set([...confirmed, ...detected].map((d) => d.channelId));
+    const knownChannel = this.db.prepare(`SELECT 1 FROM channels WHERE channel_id = ?`);
+    const upcoming = reports
+      .filter((r) => r.debutDate > today)
+      .sort((a, b) => a.debutAt.localeCompare(b.debutAt))
+      .slice(0, 30);
+    const webOnly = reports.filter(
+      (r) =>
+        r.debutDate >= sinceDate &&
+        r.debutDate <= today &&
+        !(r.channelId && (known.has(r.channelId) || knownChannel.get(r.channelId))),
+    );
+    return { confirmed, detected, detectedTotal: Number(total.n), upcoming, webOnly };
+  }
+
+  // ---------------------------------------------------------------- 웹 데뷔 소식 · 버튜버 확정 목록
+
+  private toReport(r: Record<string, unknown>): DebutReport {
+    let sources: DebutSource[] = [];
+    try {
+      const v = JSON.parse(String(r.sources ?? "[]"));
+      if (Array.isArray(v)) sources = v;
+    } catch {
+      /* 무시 */
+    }
+    return {
+      id: Number(r.id),
+      name: r.name as string,
+      agency: (r.agency as string | null) ?? null,
+      platform: (r.platform as Platform | null) ?? null,
+      channelId: (r.channel_id as string | null) ?? null,
+      channelUrl: (r.channel_url as string | null) ?? null,
+      debutAt: r.debut_at as string,
+      debutDate: r.debut_date as string,
+      status: r.status === "upcoming" ? "upcoming" : "debuted",
+      summary: (r.summary as string | null) ?? null,
+      sources,
+      hidden: Number(r.hidden) === 1,
+    };
+  }
+
+  listDebutReports(includeHidden = false, limit = 500): DebutReport[] {
+    const rows = this.db
+      .prepare(`
+        SELECT * FROM debut_reports ${includeHidden ? "" : "WHERE hidden = 0"}
+        ORDER BY debut_date DESC, id DESC LIMIT ?
+      `)
+      .all(limit) as unknown as Array<Record<string, unknown>>;
+    return rows.map((r) => this.toReport(r));
+  }
+
+  /**
+   * 데뷔 소식 저장. 같은 채널(또는 채널을 모르면 같은 이름+소속)이 있으면 새 정보로 갱신하고 출처를 합친다.
+   * 반환: added | updated
+   */
+  upsertDebutReport(rep: NewDebutReport): "added" | "updated" {
+    const norm = (s: string | null) => (s ?? "").toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
+    const now = new Date().toISOString();
+    let existing: Record<string, unknown> | undefined;
+    if (rep.channelId) {
+      existing = this.db
+        .prepare(`SELECT * FROM debut_reports WHERE channel_id = ? LIMIT 1`)
+        .get(rep.channelId) as Record<string, unknown> | undefined;
+    }
+    if (!existing) {
+      const cands = this.db
+        .prepare(`SELECT * FROM debut_reports WHERE debut_date >= ?`)
+        .all(kstDate(Date.now() - 120 * 86_400_000)) as unknown as Array<Record<string, unknown>>;
+      existing = cands.find(
+        (c) => norm(c.name as string) === norm(rep.name) && (!rep.agency || !c.agency || norm(c.agency as string) === norm(rep.agency)),
+      );
+    }
+    if (!existing) {
+      this.db
+        .prepare(`
+          INSERT INTO debut_reports (name, agency, platform, channel_id, channel_url, debut_at, debut_date, status, summary, sources, found_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `)
+        .run(rep.name, rep.agency, rep.platform, rep.channelId, rep.channelUrl, rep.debutAt, rep.debutDate,
+          rep.status, rep.summary, JSON.stringify(rep.sources), now, now);
+      return "added";
+    }
+    const old = this.toReport(existing);
+    const urls = new Set(old.sources.map((s) => s.url));
+    const sources = [...old.sources, ...rep.sources.filter((s) => !urls.has(s.url))].slice(0, 6);
+    this.db
+      .prepare(`
+        UPDATE debut_reports SET
+          agency = COALESCE(?, agency), platform = COALESCE(?, platform), channel_id = COALESCE(?, channel_id),
+          channel_url = COALESCE(?, channel_url), debut_at = ?, debut_date = ?, status = ?,
+          summary = COALESCE(?, summary), sources = ?, updated_at = ?
+        WHERE id = ?
+      `)
+      .run(rep.agency, rep.platform, rep.channelId, rep.channelUrl, rep.debutAt, rep.debutDate, rep.status,
+        rep.summary, JSON.stringify(sources), now, old.id);
+    return "updated";
+  }
+
+  setDebutReportHidden(id: number, hidden: boolean): boolean {
+    const res = this.db.prepare(`UPDATE debut_reports SET hidden = ? WHERE id = ?`).run(hidden ? 1 : 0, id);
+    return Number(res.changes) > 0;
+  }
+
+  listRegistry(): RegistryEntry[] {
+    const rows = this.db
+      .prepare(`SELECT platform, channel_id, name FROM vtuber_registry ORDER BY added_at`)
+      .all() as unknown as Array<Record<string, unknown>>;
+    return rows.map((r) => ({
+      platform: r.platform as Platform,
+      channelId: r.channel_id as string,
+      name: r.name as string,
+    }));
+  }
+
+  /** 확정 목록에 추가 (이미 있으면 무시). 새로 추가됐으면 true */
+  addRegistry(e: RegistryEntry, source: string): boolean {
+    const res = this.db
+      .prepare(`INSERT OR IGNORE INTO vtuber_registry (platform, channel_id, name, source, added_at) VALUES (?, ?, ?, ?, ?)`)
+      .run(e.platform, e.channelId, e.name, source, new Date().toISOString());
+    return Number(res.changes) > 0;
   }
 
   /** 윈도우(분) 내 평균 시청자 기준 랭킹 */
