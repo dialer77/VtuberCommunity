@@ -7,6 +7,7 @@ import { PostgresStore } from "./store/postgres";
 import type { Store } from "./store/types";
 import { log } from "./log";
 import { startAiJobs } from "./issues/scheduler";
+import { migrateUserDb, userDbEnabled } from "./userdb/db";
 import { buildAgencyRoster, loadRosterSeed } from "./tags/roster";
 import { setAgencyRoster } from "./tags/catalog";
 
@@ -44,6 +45,16 @@ if (store instanceof SqliteStore) {
   };
   log.info(`소속사 명단: ${refreshRoster(store)}개 채널`);
   setInterval(() => refreshRoster(store), 30 * 60_000);
+}
+
+// 사용자 DB 스키마 적용 (실패해도 방송 수집·공개 API 는 계속 동작)
+if (userDbEnabled()) {
+  try {
+    await migrateUserDb();
+    log.info("사용자 DB 연결됨");
+  } catch (e) {
+    log.error(`사용자 DB 준비 실패: ${String(e)}`);
+  }
 }
 
 // REST API (읽기 라우트는 SqliteStore 기준)

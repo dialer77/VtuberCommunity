@@ -1,6 +1,8 @@
 import Fastify from "fastify";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { SqliteStore, LiveItem, UserInfo, RankingMetric } from "./store/sqlite";
+import { timingSafeEqual } from "node:crypto";
+import { channelUrl } from "./store/sqlite";
+import type { SqliteStore, LiveItem, RankingMetric } from "./store/sqlite";
 import type { Platform } from "./domain";
 import {
   TAG_CATALOG,
@@ -11,16 +13,40 @@ import {
 import { curatedProfile } from "./profiles";
 import { config } from "./config";
 import { VERSION, STARTED_AT } from "./version";
+import { userDbEnabled } from "./userdb/db";
+import {
+  addFavorite,
+  deleteUser,
+  listFavorites,
+  removeFavorite,
+  setFavoriteNotify,
+  upsertUser,
+} from "./userdb/users";
+import {
+  isAllowedPushEndpoint,
+  pushEnabled,
+  removePushSubscription,
+  savePushSubscription,
+} from "./userdb/push";
 
-/** 유저 데이터 API 가드 — 공유 시크릿이 맞을 때만 통과 (우리 웹 서버만 호출) */
+/** 유저 데이터 API 가드 — 공유 시크릿이 맞고 사용자 DB 가 설정돼 있을 때만 통과 (우리 웹 서버만 호출) */
 function checkInternal(req: FastifyRequest, reply: FastifyReply): boolean {
-  const secret = (req.headers["x-internal-secret"] as string | undefined) ?? "";
-  if (!config.internalSecret || secret !== config.internalSecret) {
-    reply.code(401);
+  const got = Buffer.from((req.headers["x-internal-secret"] as string | undefined) ?? "");
+  const want = Buffer.from(config.internalSecret);
+  if (!config.internalSecret || got.length !== want.length || !timingSafeEqual(got, want)) {
+    reply.code(401).send({ error: "unauthorized" });
+    return false;
+  }
+  if (!userDbEnabled()) {
+    reply.code(503).send({ error: "user_db_disabled" });
     return false;
   }
   return true;
 }
+
+const PLATFORMS: Platform[] = ["chzzk", "soop", "youtube"];
+const shortText = (v: unknown, max: number): string | null =>
+  typeof v === "string" && v.length > 0 && v.length <= max ? v : null;
 
 interface TagRef {
   id: string;
@@ -199,50 +225,107 @@ export function buildApi(store: SqliteStore) {
 
   // ---- 유저 데이터 (공유 시크릿 보호, 우리 웹 서버만 호출) ----
 
-  // 로그인 시 유저 upsert
+  // 로그인 시 유저 저장
   app.post("/api/user/upsert", async (req, reply) => {
-    if (!checkInternal(req, reply)) return { error: "unauthorized" };
-    const u = req.body as UserInfo;
-    if (!u?.id) {
-      reply.code(400);
-      return { error: "id required" };
-    }
-    store.upsertUser(u);
+    if (!checkInternal(req, reply)) return reply;
+    const b = (req.body ?? {}) as { id?: unknown; name?: unknown; image?: unknown };
+    const id = shortText(b.id, 128);
+    if (!id) return reply.code(400).send({ error: "id required" });
+    await upsertUser({ id, name: shortText(b.name, 100), image: shortText(b.image, 500) });
     return { ok: true };
   });
 
-  // 즐겨찾기 목록
+  // 탈퇴 — 사용자 데이터 전부 삭제
+  app.delete("/api/user/:userId", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    await deleteUser((req.params as { userId: string }).userId);
+    return { ok: true };
+  });
+
+  // 최애 목록 (+ 현재 방송 상태)
   app.get("/api/user/:userId/favorites", async (req, reply) => {
-    if (!checkInternal(req, reply)) return { error: "unauthorized" };
-    const { userId } = req.params as { userId: string };
-    return { favorites: store.getFavorites(userId) };
+    if (!checkInternal(req, reply)) return reply;
+    const favorites = await listFavorites((req.params as { userId: string }).userId);
+    const lives = new Map(store.getCurrentLives().map((l) => [l.channelId, l]));
+    return {
+      favorites: favorites.map((f) => {
+        const live = lives.get(f.channelId);
+        return {
+          channelId: f.channelId,
+          channelName: live?.channelName ?? f.channelName ?? f.channelId,
+          platform: f.platform,
+          channelUrl: channelUrl(f.platform, f.channelId),
+          notify: f.notify,
+          isLive: !!live,
+          viewers: live?.viewers ?? null,
+          title: live?.title ?? null,
+          thumbnailUrl: live?.thumbnailUrl ?? null,
+        };
+      }),
+    };
   });
 
-  // 즐겨찾기 추가
+  // 최애 추가
   app.post("/api/user/:userId/favorites", async (req, reply) => {
-    if (!checkInternal(req, reply)) return { error: "unauthorized" };
+    if (!checkInternal(req, reply)) return reply;
     const { userId } = req.params as { userId: string };
-    const b = req.body as {
-      platform?: Platform;
-      channelId?: string;
-      channelName?: string;
-    };
-    if (!b?.platform || !b?.channelId) {
-      reply.code(400);
-      return { error: "platform, channelId required" };
+    const b = (req.body ?? {}) as { platform?: unknown; channelId?: unknown; channelName?: unknown };
+    const channelId = shortText(b.channelId, 64);
+    if (!channelId || !PLATFORMS.includes(b.platform as Platform)) {
+      return reply.code(400).send({ error: "platform, channelId required" });
     }
-    store.addFavorite(userId, b.platform, b.channelId, b.channelName ?? null);
+    const ok = await addFavorite(userId, b.platform as Platform, channelId, shortText(b.channelName, 100));
+    if (!ok) return reply.code(409).send({ error: "favorite_limit" });
     return { ok: true };
   });
 
-  // 즐겨찾기 삭제
+  // 최애 알림 켜기/끄기
+  app.patch("/api/user/:userId/favorites/:channelId", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, channelId } = req.params as { userId: string; channelId: string };
+    const notify = (req.body as { notify?: unknown } | undefined)?.notify;
+    if (typeof notify !== "boolean") return reply.code(400).send({ error: "notify required" });
+    await setFavoriteNotify(userId, channelId, notify);
+    return { ok: true };
+  });
+
+  // 최애 삭제
   app.delete("/api/user/:userId/favorites/:channelId", async (req, reply) => {
-    if (!checkInternal(req, reply)) return { error: "unauthorized" };
-    const { userId, channelId } = req.params as {
-      userId: string;
-      channelId: string;
-    };
-    store.removeFavorite(userId, channelId);
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, channelId } = req.params as { userId: string; channelId: string };
+    await removeFavorite(userId, channelId);
+    return { ok: true };
+  });
+
+  // 웹 푸시 공개키 (브라우저 구독에 필요, 비밀 아님)
+  app.get("/api/push/public-key", async () => ({
+    enabled: pushEnabled(),
+    publicKey: pushEnabled() ? config.vapidPublicKey : null,
+  }));
+
+  // 브라우저 알림 구독 저장
+  app.post("/api/user/:userId/push", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId } = req.params as { userId: string };
+    const b = (req.body ?? {}) as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
+    const endpoint = shortText(b.endpoint, 1000);
+    const p256dh = shortText(b.keys?.p256dh, 200);
+    const auth = shortText(b.keys?.auth, 100);
+    if (!endpoint || !p256dh || !auth || !isAllowedPushEndpoint(endpoint)) {
+      return reply.code(400).send({ error: "invalid_subscription" });
+    }
+    const ok = await savePushSubscription(userId, { endpoint, p256dh, auth });
+    if (!ok) return reply.code(409).send({ error: "subscription_limit" });
+    return { ok: true };
+  });
+
+  // 브라우저 알림 구독 해제
+  app.delete("/api/user/:userId/push", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId } = req.params as { userId: string };
+    const endpoint = shortText((req.body as { endpoint?: unknown } | undefined)?.endpoint, 1000);
+    if (!endpoint) return reply.code(400).send({ error: "endpoint required" });
+    await removePushSubscription(userId, endpoint);
     return { ok: true };
   });
 

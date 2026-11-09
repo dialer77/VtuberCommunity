@@ -3,12 +3,14 @@ import type { LiveStream } from "@/types";
 import { PLATFORMS } from "@/types";
 import { PlatformBadge } from "@/components/platform-badge";
 import { formatCount, elapsedSince } from "@/lib/format";
+import { FavoriteButton } from "@/components/auth/favorite-button";
 
 export function LiveCard({ stream }: { stream: LiveStream }) {
   const color = PLATFORMS[stream.platform].color;
   const initial = stream.vtuberName.trim().charAt(0);
 
   return (
+    <div className="relative">
     <Link
       href={`/vtuber/${stream.platform}/${stream.vtuberId}`}
       className="group flex flex-col rounded-xl border border-border bg-surface overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-xl hover:shadow-black/[0.06]"
@@ -85,5 +87,12 @@ export function LiveCard({ stream }: { stream: LiveStream }) {
         ) : null}
       </div>
     </Link>
+    <div className="absolute top-2 right-2">
+      <FavoriteButton
+        compact
+        target={{ platform: stream.platform, channelId: stream.vtuberId, channelName: stream.vtuberName }}
+      />
+    </div>
+    </div>
   );
 }

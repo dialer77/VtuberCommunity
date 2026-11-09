@@ -3,6 +3,7 @@ import { getLiveStreams, getTags } from "@/lib/data";
 import { LiveCard } from "@/components/live-card";
 import { Stat } from "@/components/stat";
 import { TagBar } from "@/components/tag-bar";
+import { FavoriteLiveRow } from "@/components/auth/favorite-live-row";
 import { AdSlot } from "@/components/ad-slot";
 import { formatCount } from "@/lib/format";
 
@@ -38,6 +39,8 @@ export default async function HomePage({
           <Stat label="플랫폼" value={formatCount(platforms)} unit="개" />
         </div>
       </section>
+
+      <FavoriteLiveRow />
 
       <TagBar tags={tags} active={tag} />
 

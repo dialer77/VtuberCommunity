@@ -5,6 +5,7 @@ import { getChannelProfile } from "@/lib/data";
 import { Avatar } from "@/components/avatar";
 import { PlatformBadge } from "@/components/platform-badge";
 import { formatCount, formatDate, formatDateTime } from "@/lib/format";
+import { FavoriteButton } from "@/components/auth/favorite-button";
 
 export const dynamic = "force-dynamic";
 
@@ -76,6 +77,7 @@ export default async function VtuberProfilePage({
               </div>
             ) : null}
           </div>
+          <FavoriteButton target={{ platform: p.platform, channelId: p.channelId, channelName: p.name }} />
         </div>
 
         {p.isLive ? (

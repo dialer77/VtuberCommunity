@@ -22,6 +22,14 @@ export const config = {
   /** 유저 데이터 API 보호용 공유 시크릿 (웹 서버 ↔ 백엔드). 비어있으면 유저 API 비활성 */
   internalSecret: process.env.INTERNAL_SECRET ?? "",
 
+  // ---- 사용자 데이터 (로그인·최애·알림) — docs/user-accounts.md
+  /** 사용자 DB(Postgres) 접속 주소. 비어 있으면 로그인 기능 전체 비활성 */
+  userDatabaseUrl: process.env.USER_DATABASE_URL ?? "",
+  /** 웹 푸시 VAPID 키. 비어 있으면 알림만 비활성 */
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
+  vapidSubject: process.env.VAPID_SUBJECT ?? "https://vmoa.live",
+
   // ---- 이슈 자동 수집 (Claude Code 헤드리스 + 구독 인증) — docs/issue-collector.md
   /** 1 이면 주기적으로 이슈 수집 */
   issuesEnabled: process.env.ISSUES_ENABLED === "1",

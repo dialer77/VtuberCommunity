@@ -6,6 +6,7 @@ import type { Store } from "./store/types";
 import type { LiveSnapshot } from "./domain";
 import { config } from "./config";
 import { log } from "./log";
+import { notifyLiveStarts, pushEnabled } from "./userdb/push";
 
 // 직전 사이클 시각 — 이번 사이클이 대표하는 시간(분)을 계산 (일별 집계용)
 let lastCycleMs = 0;
@@ -70,6 +71,11 @@ export async function runCycle(store: Store, cycle: number): Promise<void> {
   for (const d of debuts) {
     const mark = hasDebutSignal(d.title) ? "🎀 데뷔 방송" : "🆕 신규 채널";
     log.event(`  ${mark}: ${d.channelName} (${d.platform}) — "${d.title}"`);
+  }
+
+  // 4-1. 최애 방송 시작 알림 (수집 사이클을 막지 않게 분리, 실패해도 수집에는 영향 없음)
+  if (pushEnabled()) {
+    void notifyLiveStarts(snapshots).catch((e) => log.error(`방송 시작 알림 실패: ${String(e)}`));
   }
 
   // 5. PRUNE — 보존 기간 초과 스냅샷 정리 (DB 무한 증가 방지)

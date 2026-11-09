@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { NavLinks } from "@/components/nav-links";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { UserMenu } from "@/components/auth/user-menu";
 
 export function SiteHeader() {
   return (
@@ -19,6 +20,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-1 min-w-0">
           <NavLinks />
           <ThemeToggle />
+          <UserMenu />
         </div>
       </div>
     </header>
