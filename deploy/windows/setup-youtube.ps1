@@ -3,26 +3,34 @@
 
     powershell -ExecutionPolicy Bypass -File deploy\windows\setup-youtube.ps1
 
-  하는 일
-    1. 키 입력 (화면에 보이지 않음. 그냥 Enter 면 저장된 키를 다시 시험)
-    2. YouTube 에 시험 요청 1회 (할당량 1 소모) → 키·제한 설정 확인
-    3. server\.env 에 YOUTUBE_API_KEY 저장 → 서버 재시작
+  키 넣는 방법 (권장: 파일)
+    메모장에 키 한 줄을 붙여넣고 바탕화면에 youtube-key.txt 로 저장한 뒤 위 명령을 실행.
+    → 스크립트가 파일을 읽고, 등록에 성공하면 파일을 지운다 (키는 server\.env 에만 남음).
+    파일이 없으면 직접 입력을 받는다 (붙여넣기는 마우스 오른쪽 클릭).
 
-  붙여넣기: 이 창에서는 Ctrl+V 가 안 될 수 있다 → 마우스 오른쪽 클릭으로 붙여넣기.
-  그래도 안 되면 키를 복사해 둔 상태에서 -FromClipboard 로 실행.
+  하는 일
+    1. 키 읽기 (파일 → 없으면 입력. 입력에서 그냥 Enter 면 저장된 키를 다시 시험)
+    2. YouTube 에 시험 요청 1회 (할당량 1 소모) → 키·제한 설정 확인
+    3. server\.env 에 YOUTUBE_API_KEY 저장 → 서버 재시작 → 키 파일 삭제
 
   옵션
-    -FromClipboard  입력 대신 클립보드의 키를 사용
+    -KeyFile 경로   바탕화면이 아닌 다른 곳의 키 파일 사용
+    -FromClipboard  클립보드의 키 사용
     -Disable        키 삭제 (YouTube 연동 끄기)
 #>
-param([switch]$Disable, [switch]$FromClipboard)
+param([switch]$Disable, [switch]$FromClipboard, [string]$KeyFile = '')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '_common.ps1')
 
 function Step([string]$m) { Write-Host ''; Write-Host "== $m" -ForegroundColor Cyan }
 function Ok([string]$m)   { Write-Host "   OK  $m" -ForegroundColor Green }
 function Warn([string]$m) { Write-Host "   !!  $m" -ForegroundColor Yellow }
-function Fail([string]$m) { Write-Host "   XX  $m" -ForegroundColor Red; exit 1 }
+function Fail([string]$m) {
+  Write-Host "   XX  $m" -ForegroundColor Red
+  if ($script:UsedKeyFile) { Write-Host ('       키 파일은 지우지 않았습니다 — 문제를 고친 뒤 다시 실행하세요: {0}' -f $script:UsedKeyFile) }
+  exit 1
+}
+$script:UsedKeyFile = ''
 
 if (-not (Test-IsAdmin)) { Fail '관리자 권한 PowerShell 에서 실행하세요.' }
 if (-not (Test-Path $EnvFile)) { Fail ('server\.env 가 없습니다. setup.ps1 을 먼저 실행하세요: {0}' -f $EnvFile) }
@@ -48,11 +56,26 @@ if ($Disable) {
 # ------------------------------------------------------------------ 1. 키 입력
 Step 'API 키 입력'
 $saved = Get-EnvValue 'YOUTUBE_API_KEY'
-$pasteHelp = 'Ctrl+V 대신 마우스 오른쪽 클릭으로 붙여넣거나, 키를 복사한 뒤 -FromClipboard 를 붙여 실행하세요.'
-if ($FromClipboard) {
+$DefaultKeyFile = Join-Path ([Environment]::GetFolderPath('Desktop')) 'youtube-key.txt'
+$pasteHelp = ('바탕화면에 youtube-key.txt 로 키를 저장한 뒤 다시 실행하세요 ({0}).' -f $DefaultKeyFile)
+if ($KeyFile) {
+  if (-not (Test-Path -LiteralPath $KeyFile -PathType Leaf)) { Fail ('키 파일이 없습니다: {0}' -f $KeyFile) }
+  $script:UsedKeyFile = (Resolve-Path -LiteralPath $KeyFile).Path
+} elseif (-not $FromClipboard -and (Test-Path -LiteralPath $DefaultKeyFile -PathType Leaf)) {
+  $script:UsedKeyFile = $DefaultKeyFile
+}
+
+if ($script:UsedKeyFile) {
+  $text = [IO.File]::ReadAllText($script:UsedKeyFile)
+  # "KEY=AIza..." 처럼 다른 글자가 섞여 있어도 키 부분만 꺼낸다
+  $m = [regex]::Match($text, 'AIza[0-9A-Za-z_-]{35}')
+  if ($m.Success) { $key = $m.Value } else { $key = $text }
+  Ok ('키 파일에서 읽었습니다: {0}' -f $script:UsedKeyFile)
+} elseif ($FromClipboard) {
   $key = "$(Get-Clipboard -Raw)"
   Ok '클립보드에서 키를 읽었습니다.'
 } else {
+  Write-Host ('   키 파일이 없어 직접 입력을 받습니다 (파일로 하려면: {0}).' -f $DefaultKeyFile)
   Write-Host '   붙여넣기는 마우스 오른쪽 클릭 (Ctrl+V 는 이 창에서 안 될 수 있음). 별표(*)가 39개쯤 찍히면 정상.'
   $prompt = '   YouTube API 키 붙여넣고 Enter (화면에 보이지 않음)'
   if ($saved) { $prompt = '   새 키 붙여넣고 Enter — 그냥 Enter 면 저장된 키를 다시 시험 (화면에 보이지 않음)' }
@@ -60,9 +83,9 @@ if ($FromClipboard) {
   $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
   try { $key = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
 }
-# 공백·줄바꿈·제어 문자(Ctrl+V 가 그대로 들어간 경우 등) 제거
-$key = $key -replace '[\s\x00-\x1F\x7F]', ''
-if (-not $key -and -not $FromClipboard) { $key = $saved }
+# 공백·줄바꿈·제어 문자(Ctrl+V 가 그대로 들어간 경우 등)·BOM 제거
+$key = $key -replace '[\s\x00-\x1F\x7F﻿​]', ''
+if (-not $key -and -not $FromClipboard -and -not $script:UsedKeyFile) { $key = $saved }
 if (-not $key) { Fail ('키가 비어 있습니다. {0}' -f $pasteHelp) }
 if ($key -notmatch '^[A-Za-z0-9_-]{30,60}$') {
   Fail ('키 형식이 아닙니다 ({0}자). 붙여넣기가 제대로 안 된 것 같습니다. {1}' -f $key.Length, $pasteHelp)
@@ -122,6 +145,12 @@ Set-EnvValue 'YOUTUBE_API_KEY' $key
 Ok 'YOUTUBE_API_KEY 저장'
 & icacls $EnvFile /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' | Out-Null
 Ok 'server\.env 권한: SYSTEM·Administrators 전용'
+if ($script:UsedKeyFile) {
+  $kf = $script:UsedKeyFile
+  $script:UsedKeyFile = ''
+  Remove-Item -LiteralPath $kf -Force -ErrorAction SilentlyContinue
+  if (Test-Path -LiteralPath $kf) { Warn ('키 파일을 지우지 못했습니다 — 직접 지워 주세요: {0}' -f $kf) } else { Ok ('키 파일 삭제: {0}' -f $kf) }
+}
 Restart-Server
 
 Write-Host ''
