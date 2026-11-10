@@ -7,6 +7,7 @@ import { PlatformBadge } from "@/components/platform-badge";
 import { formatCount, formatDate, formatDateTime } from "@/lib/format";
 import { FavoriteButton } from "@/components/auth/favorite-button";
 import { YoutubeLiveBox, YoutubeVideos } from "@/components/youtube-videos";
+import { ClipGrid, ClipNotice, ClipTagChip } from "@/components/clip-card";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,9 @@ export default async function VtuberProfilePage({
   const p = await getChannelProfile(platform, channelId);
   if (!p) notFound();
   const yt = p.youtube ?? null;
-  const showVideos = !!yt && tab === "videos";
+  const clips = p.clips ?? null;
+  const activeTab: "history" | "videos" | "clips" =
+    tab === "videos" && yt ? "videos" : tab === "clips" && clips ? "clips" : "history";
   const base = `/vtuber/${p.platform}/${p.channelId}`;
 
   return (
@@ -156,21 +159,51 @@ export default async function VtuberProfilePage({
         <StatBox label="감지일" value={formatDate(p.firstSeenAt)} />
       </section>
 
-      {/* 탭: 이전 방송 기록 · 공식 영상(유튜브 채널이 연결됐을 때) */}
-      {yt ? (
-        <nav className="flex gap-2" aria-label="프로필 탭">
-          <TabLink href={base} active={!showVideos} label="이전 방송 기록" />
-          <TabLink href={`${base}?tab=videos`} active={showVideos} label={`공식 영상${yt.videos.length ? ` ${yt.videos.length}` : ""}`} />
+      {/* 탭: 이전 방송 기록 · 공식 영상(유튜브 채널이 연결됐을 때) · 키리누키(클립이 있을 때) */}
+      {yt || clips ? (
+        <nav className="flex flex-wrap gap-2" aria-label="프로필 탭">
+          <TabLink href={base} active={activeTab === "history"} label="이전 방송 기록" />
+          {yt ? (
+            <TabLink href={`${base}?tab=videos`} active={activeTab === "videos"} label={`공식 영상${yt.videos.length ? ` ${yt.videos.length}` : ""}`} />
+          ) : null}
+          {clips ? <TabLink href={`${base}?tab=clips`} active={activeTab === "clips"} label={`키리누키 ${clips.total}`} /> : null}
         </nav>
       ) : null}
 
-      {showVideos && yt ? (
+      {activeTab === "videos" && yt ? (
         <section className="flex flex-col gap-3" aria-label="공식 영상">
           <YoutubeVideos yt={yt} />
         </section>
+      ) : activeTab === "clips" && clips ? (
+        <section className="flex flex-col gap-4" aria-label="키리누키">
+          {clips.traits.length || clips.topics.length ? (
+            <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4">
+              <p className="text-xs font-bold text-muted">클립으로 본 {p.name} (버모아 분류)</p>
+              {clips.traits.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {clips.traits.map((t) => (
+                    <ClipTagChip key={t.id} tag={t} count={t.count} href={`/clips?tag=${t.id}&v=${p.platform}:${p.channelId}`} />
+                  ))}
+                </div>
+              ) : null}
+              {clips.topics.length ? (
+                <p className="text-sm text-muted">
+                  자주 나오는 것: <span className="text-foreground">{clips.topics.map((t) => t.topic).join(" · ")}</span>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <ClipGrid clips={clips.clips} narrow />
+          {clips.total > clips.clips.length ? (
+            <Link href={`/clips?v=${p.platform}:${p.channelId}`} className="w-fit text-sm text-accent hover:underline">
+              클립 {clips.total}개 모두 보기 →
+            </Link>
+          ) : null}
+          <ClipNotice />
+        </section>
       ) : (
       <section className="flex flex-col gap-3">
-        {yt ? null : <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>}
+        {yt || clips ? null : <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>}
         {p.broadcasts.length === 0 ? (
           <p className="text-sm text-muted-2">아직 기록된 방송이 없어요.</p>
         ) : (

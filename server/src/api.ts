@@ -12,6 +12,8 @@ import {
 } from "./tags/catalog";
 import { curatedProfile } from "./profiles";
 import { youtubeForProfile, youtubeLiveItems } from "./youtube/view";
+import { clipDetail, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
+import { clipTagById } from "./clips/vocab";
 import { config } from "./config";
 import { VERSION, STARTED_AT } from "./version";
 import { userDbEnabled } from "./userdb/db";
@@ -143,7 +145,35 @@ export function buildApi(store: SqliteStore) {
       tags: toTagRefs(resolveChannelTags(profile.channelId, rawTags)),
       curated: curatedProfile(profile.channelId),
       youtube: youtubeForProfile(store, profile.platform, profile.channelId),
+      clips: clipsForProfile(store, profile.platform, profile.channelId),
     };
+  });
+
+  // 키리누키 (버모아 분류). ?tag=<분류 태그>&platform=&channelId=&limit=24&offset=0
+  app.get("/api/clips", async (req) => {
+    const q = req.query as { tag?: string; platform?: string; channelId?: string; limit?: string; offset?: string };
+    const limit = Math.min(60, Math.max(1, Number(q.limit) || 24));
+    const offset = Math.max(0, Number(q.offset) || 0);
+    const vtuber =
+      q.platform && q.channelId && PLATFORMS.includes(q.platform as Platform)
+        ? { platform: q.platform as Platform, channelId: q.channelId }
+        : undefined;
+    const tag = q.tag && clipTagById(q.tag) ? q.tag : undefined;
+    const r = store.clips.listClips({ tag, vtuber, limit, offset });
+    return { total: r.total, clips: toClipOuts(store, r.clips) };
+  });
+
+  app.get("/api/clips/tags", async () => ({ tags: clipTagsWithCounts(store) }));
+
+  // 클립 상세 + 같은 버튜버·다른 버튜버의 비슷한 클립
+  app.get("/api/clips/:videoId", async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const d = /^[\w-]{11}$/.test(videoId) ? clipDetail(store, videoId) : null;
+    if (!d) {
+      reply.code(404);
+      return { error: "not_found" };
+    }
+    return d;
   });
 
   // 최근 감지된 신규 채널(데뷔 후보).

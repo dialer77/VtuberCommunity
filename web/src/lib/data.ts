@@ -17,6 +17,9 @@ import type {
   PeriodRanking,
   RankingPeriod,
   RankingMetric,
+  Clip,
+  ClipDetail,
+  ClipTagCount,
 } from "@/types";
 import {
   fetchLivesFromBackend,
@@ -30,6 +33,9 @@ import {
   fetchCoins,
   fetchIssuesFromBackend,
   fetchIssueFromBackend,
+  fetchClips,
+  fetchClipTags,
+  fetchClip,
 } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
@@ -213,4 +219,30 @@ export async function getIssueBySlug(slug: string): Promise<Issue | null> {
 
 export async function getIssueSlugs(): Promise<string[]> {
   return (await getIssues()).map((i) => i.slug);
+}
+
+// ---- 키리누키 (백엔드 없으면 빈 목록)
+
+export async function getClips(q: Parameters<typeof fetchClips>[0]): Promise<{ total: number; clips: Clip[] }> {
+  try {
+    return await fetchClips(q);
+  } catch {
+    return { total: 0, clips: [] };
+  }
+}
+
+export async function getClipTags(): Promise<ClipTagCount[]> {
+  try {
+    return await fetchClipTags();
+  } catch {
+    return [];
+  }
+}
+
+export async function getClip(videoId: string): Promise<ClipDetail | null> {
+  try {
+    return await fetchClip(videoId);
+  } catch {
+    return null;
+  }
 }

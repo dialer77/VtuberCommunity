@@ -1,5 +1,5 @@
 // 유튜브 채널 RSS (youtube.com/feeds/videos.xml?channel_id=…) — 할당량을 쓰지 않는 최신 영상 15개.
-// 제목·게시 시각·영상 ID 만 쓴다. (설명·조회수는 저장하지 않음)
+// 공식 채널은 제목·게시 시각·영상 ID 만 쓴다. 설명은 키리누키 분류 입력으로만 (분류 후 지움). 조회수는 쓰지 않음
 
 const TIMEOUT_MS = 10_000;
 
@@ -7,6 +7,8 @@ export interface FeedEntry {
   videoId: string;
   title: string;
   publishedAt: string;
+  /** media:description (키리누키 분류용) */
+  description: string | null;
 }
 
 export interface Feed {
@@ -40,7 +42,12 @@ export function parseFeed(xml: string): Feed {
     const title = tag(e, "title");
     const published = tag(e, "published");
     if (!videoId || !/^[\w-]{11}$/.test(videoId) || !published || Number.isNaN(Date.parse(published))) continue;
-    entries.push({ videoId, title: title ?? "", publishedAt: new Date(published).toISOString() });
+    entries.push({
+      videoId,
+      title: title ?? "",
+      publishedAt: new Date(published).toISOString(),
+      description: tag(e, "media:description"),
+    });
   }
   return { title: tag(head, "title"), entries };
 }

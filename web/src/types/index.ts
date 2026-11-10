@@ -234,6 +234,8 @@ export interface ChannelProfile {
   broadcasts: Broadcast[];
   /** 유튜브 공식 채널 (연결 전·이전 백엔드면 없음) */
   youtube?: YoutubeChannel | null;
+  /** 키리누키 (없으면 null) */
+  clips?: ProfileClips | null;
 }
 
 /** 이슈 타임라인 아이템 (수동 큐레이션 콘텐츠) */
@@ -262,4 +264,52 @@ export interface Issue {
   /** auto = 백엔드가 AI 로 수집·정리, manual = 운영자가 직접 작성(content/issues/*.md) */
   origin: "auto" | "manual";
   sources: IssueSource[];
+}
+
+/** 버모아 클립 분류 태그 (무엇을 = category, 어떤 순간 = moment) */
+export interface ClipTag {
+  id: string;
+  label: string;
+  emoji: string;
+  kind: "category" | "moment";
+}
+
+export interface ClipTagCount extends ClipTag {
+  count: number;
+}
+
+/** 키리누키 (팬 편집 클립) + 버모아 분류 */
+export interface Clip {
+  videoId: string;
+  /** YouTube 제목 */
+  title: string;
+  publishedAt: string;
+  thumbnailUrl: string;
+  channelTitle: string | null;
+  channelUrl: string;
+  /** 누가 — 버튜버 주 채널 */
+  vtubers: { platform: Platform; channelId: string; name: string }[];
+  /** 무엇을 */
+  category: ClipTag | null;
+  topic: string | null;
+  /** 어떤 순간 */
+  moments: ClipTag[];
+  /** 한 줄 요약 (버모아) */
+  summary: string | null;
+}
+
+export interface ClipDetail {
+  clip: Clip;
+  sameVtuber: Clip[];
+  otherVtuber: Clip[];
+}
+
+/** 프로필의 키리누키 요약 */
+export interface ProfileClips {
+  total: number;
+  clips: Clip[];
+  /** 자주 나오는 순간·카테고리 */
+  traits: (ClipTag & { count: number })[];
+  /** 자주 하는 것 (게임 이름 등) */
+  topics: { topic: string; count: number }[];
 }

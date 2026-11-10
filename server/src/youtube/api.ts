@@ -177,3 +177,75 @@ export async function videosByIds(meta: MetaStore, ids: string[], essential: boo
   }
   return out;
 }
+
+// ---------------------------------------------------------------- 키리누키 (3단계)
+
+/** search.list 사용 횟수 (태평양 날짜 기준). 비싼 호출이라 따로 센다 */
+export function searchesToday(meta: MetaStore): number {
+  const raw = meta.getMeta("yt_search");
+  if (!raw) return 0;
+  try {
+    const v = JSON.parse(raw) as { date?: string; used?: number };
+    return v.date === pacificDate() ? Number(v.used ?? 0) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** search.list 를 1회 더 써도 되는지: 하루 횟수 한도 + 일반 할당량 예산(80% 이내) */
+export function searchAllowed(meta: MetaStore): boolean {
+  return searchesToday(meta) < config.clipsSearchPerDay && quotaUsedToday(meta) + SEARCH_UNITS <= config.youtubeDailyBudget * 0.8;
+}
+
+/** search.list 한 번의 할당량. 별도 한도라는 안내도 있지만 기존 방식(100단위)으로 넉넉히 센다 */
+const SEARCH_UNITS = 100;
+
+interface SearchResponse {
+  items?: { id?: { videoId?: string }; snippet?: { channelId?: string; channelTitle?: string } }[];
+}
+
+/**
+ * 영상 검색 (search.list, 100단위로 셈). 결과에서 채널 ID·채널 이름만 돌려준다 (영상 정보는 쓰지 않음 — 클립 정보는 RSS 로)
+ */
+export async function searchVideoChannels(
+  meta: MetaStore,
+  q: string,
+  publishedAfter: string,
+): Promise<{ channelId: string; channelTitle: string }[]> {
+  if (!searchAllowed(meta)) throw new QuotaExceededError("오늘 검색 한도를 다 씀");
+  meta.setMeta("yt_search", JSON.stringify({ date: pacificDate(), used: searchesToday(meta) + 1 }));
+  addQuota(meta, SEARCH_UNITS - 1); // call() 이 1단위를 더 센다
+  const j = await call<SearchResponse>(
+    meta,
+    "search",
+    {
+      part: "snippet",
+      type: "video",
+      q,
+      maxResults: "50",
+      regionCode: "KR",
+      relevanceLanguage: "ko",
+      publishedAfter,
+      safeSearch: "none",
+    },
+    false,
+  );
+  return (j.items ?? [])
+    .filter((it) => it.snippet?.channelId)
+    .map((it) => ({ channelId: it.snippet!.channelId!, channelTitle: it.snippet!.channelTitle ?? "" }));
+}
+
+interface SnippetResponse {
+  items?: { id: string; snippet?: { title?: string } }[];
+}
+
+/** 영상이 아직 있는지·제목 (50개당 1단위). 응답에 없으면 삭제·비공개 */
+export async function videoTitles(meta: MetaStore, ids: string[]): Promise<{ videoId: string; title: string | null }[]> {
+  const out: { videoId: string; title: string | null }[] = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const batch = ids.slice(i, i + 50);
+    const j = await call<SnippetResponse>(meta, "videos", { part: "snippet", id: batch.join(","), maxResults: "50" }, false);
+    for (const it of j.items ?? []) out.push({ videoId: it.id, title: it.snippet?.title ?? null });
+  }
+  return out;
+}

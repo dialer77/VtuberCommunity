@@ -42,6 +42,17 @@ export const config = {
   /** 매핑 대상: 월간 시청시간 상위 N + 지금 방송 중 + 확정 목록 */
   youtubeMapTop: Number(process.env.YOUTUBE_MAP_TOP ?? 200),
 
+  // ---- 키리누키 수집·분류 (3단계) — docs/youtube-api.md 4장
+  /** 켜기 (기본: 이슈 수집과 같이). YouTube 키도 있어야 동작 (채널 발견에 search.list) */
+  clipsEnabled: (process.env.CLIPS_ENABLED ?? process.env.ISSUES_ENABLED) === "1",
+  /** 하루 search.list 횟수 (1회 100단위로 셈) */
+  clipsSearchPerDay: Number(process.env.CLIPS_SEARCH_PER_DAY ?? 20),
+  /** 채널을 찾을 버튜버 범위: 월간 시청시간 상위 N */
+  clipsTop: Number(process.env.CLIPS_TOP ?? 150),
+  /** 분류 주기(분)·한 번에 분류할 클립 수 */
+  clipsClassifyIntervalMin: Number(process.env.CLIPS_CLASSIFY_INTERVAL_MIN ?? 30),
+  clipsClassifyBatch: Number(process.env.CLIPS_CLASSIFY_BATCH ?? 50),
+
   // ---- 이슈 자동 수집 (Claude Code 헤드리스 + 구독 인증) — docs/issue-collector.md
   /** 1 이면 주기적으로 이슈 수집 */
   issuesEnabled: process.env.ISSUES_ENABLED === "1",

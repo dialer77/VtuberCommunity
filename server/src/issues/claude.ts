@@ -70,8 +70,9 @@ export async function runClaudeJson<T>(
     "--strict-mcp-config",
     "--no-session-persistence",
     "--disable-slash-commands",
+    // 빈 목록이면 도구를 모두 끈다 ("--tools \"\""). --allowedTools 는 값이 하나 이상 있어야 함
     "--tools", opts.tools.join(","),
-    "--allowedTools", ...opts.tools,
+    ...(opts.tools.length ? ["--allowedTools", ...opts.tools] : []),
   ];
   if (config.claudeModel) args.push("--model", config.claudeModel);
 

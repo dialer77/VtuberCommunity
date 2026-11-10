@@ -2,7 +2,7 @@
 
 새 세션은 이 문서부터 읽고 시작합니다. 현재 상태, 남은 설정, 다음 작업 순서, 이미 정한 결정, 작업 규칙을 모았습니다.
 
-기준일: 2026-11-10
+기준일: 2026-11-11
 
 ## 1. 한눈에 보기
 
@@ -23,7 +23,7 @@
 | `docs/deploy-windows-tunnel.md` | 배포 PC·터널·Vercel 연결, 운영 스크립트 |
 | `docs/issue-collector.md` | 이슈 자동 수집 (Claude 구독 + Claude Code 헤드리스) |
 | `docs/user-accounts.md` | 로그인·최애·웹 푸시 설정, 외부 DB 이전 |
-| `docs/youtube-api.md` | YouTube API 키, 공식 채널 연동 운영(`youtube.ps1`), 할당량, 지켜야 할 정책 |
+| `docs/youtube-api.md` | YouTube API 키, 공식 채널 연동(`youtube.ps1`)·키리누키(`clips.ps1`) 운영, 할당량, 지켜야 할 정책 |
 | `docs/search-console.md` | Google Search Console |
 
 ## 2. 지금 상태
@@ -38,12 +38,14 @@
 - 소속사 필터: 소속사 명단(roster) 기반 판정 (`server/src/tags/roster.ts`, `roster-seed.json`)
 - V코인(`/coins`): 비공식 베타로 메뉴에서 숨김
 - 유튜브 공식 채널 연동 (2단계): 채널 매핑(치지직 `socialLinks`·SOOP `link` 의 유튜브 링크로 자동 추정 + 운영자 확정 `deploy\windows\youtube.ps1`), 프로필 "공식 영상" 탭(RSS + `videos.list`, 사이트 안 재생), 유튜브 라이브 감지(LIVE 목록·프로필에만, 홈 합계·랭킹·데뷔 감지 제외), 30일 갱신·정리. 코드 `server/src/youtube/`, 운영 `docs/youtube-api.md` 3장
+- 키리누키 수집·분류 (3단계): 키리누키 채널 발견(`search.list` 하루 20회, 채널 ID 만) → RSS 추적 → Claude 헤드리스 분류(누가·무엇을·어떤 순간·한 줄 요약, RSS 제목·설명만 입력) → 비슷한 클립(같은 버튜버·다른 버튜버). `/clips` 모음·태그별, `/clips/<ID>` 상세, 프로필 "키리누키" 탭(특징 태그). 코드 `server/src/clips/`, 운영 `deploy\windows\clips.ps1`, `docs/youtube-api.md` 4장
 
 ### 코드는 배포됐고, 사용자가 설정해야 켜지는 것
 배포 PC 작업은 RDP 로 사용자가 직접 실행합니다.
 
 - [x] **YouTube API 키 등록** (2026-11-10 완료): 배포 PC `server\.env` 의 `YOUTUBE_API_KEY`. 교체할 때는 바탕화면 `youtube-key.txt` → `deploy\windows\setup-youtube.ps1` (`docs/youtube-api.md`). 키가 있으므로 공식 채널 연동이 자동으로 켜져 있음 (하루 보통 2,000단위 아래, 예산 8,000)
 - [ ] **유튜브 매핑 정리**: 배포 후 1~2시간이면 상위 200명 1회차가 끝남. `deploy\windows\youtube.ps1 pending` 으로 후보가 여럿·다시보기만·공용 채널인 버튜버를 `set`/`none` 으로 정리, `list nolink` 중 공식 채널이 있는 버튜버는 `set` (개발 PC 시험 기준 190명 중 확인필요 13명, 링크없음 41명)
+- [ ] **키리누키 확인** (배포 후 하루쯤): `deploy\windows\clips.ps1 status` 로 채널·클립이 쌓이는지, `recent 30` 으로 분류가 맞는지 보고, 클립 채널이 아닌 것은 `block`. 분류는 Claude 구독 토큰을 쓰므로 **이슈 수집 토큰 교체 전에는 실패할 수 있음** (30분 뒤 자동 재시도). 서버 `.env` 에 `ISSUES_ENABLED=1` 이 없으면 `CLIPS_ENABLED=1` 을 넣어야 켜짐
 - [ ] **사용자 DB**: `deploy\windows\setup-userdb.ps1` (`docs/user-accounts.md` 1단계)
 - [ ] **구글 로그인**: Google OAuth 클라이언트 발급 → Vercel 환경변수 5개 → 재배포 (`docs/user-accounts.md` 2·3단계)
 - [ ] **이슈 수집 토큰 교체**: 사용자가 Claude 계정을 바꿀 예정이라 새 계정으로 다시 발급 — `deploy\windows\setup-issues.ps1 -RenewToken`
@@ -53,6 +55,7 @@
 - 아이폰(홈 화면에 추가) 웹 푸시 (PC Chrome 에서는 실제 FCM 발송·표시까지 확인함)
 - 로그인된 Chrome 에서 사이트 안 유튜브 재생 시 Premium 광고 제거 여부
 - 유튜브 연동을 실제 API 키로 돌린 결과 — 개발 PC 에서는 실제 치지직·SOOP 링크·RSS + 가짜 YouTube API 로 시험 (매핑·영상 상세·라이브 카드·공식 영상 탭 화면). 실제 키의 라이브 감지·할당량은 배포 PC `youtube.ps1 status` 로 확인
+- 키리누키를 실제 `search.list` 로 찾은 결과 — 개발 PC 에서는 실제 키리누키 채널 4곳의 RSS 51개를 실제 Claude 로 분류(51개 모두 클립으로 판정, 버튜버·주제·순간이 제목과 맞음. 시험 DB 랭킹에 없던 버튜버는 후보에 없어 빠짐)했고, 검색은 가짜 API 로 거르기 규칙만 확인
 
 ## 3. 다음 작업 (순서대로)
 
@@ -73,7 +76,14 @@
   - API 로 받은 데이터는 30일 안에 갱신하거나 삭제 → 저장 시 `fetched_at` 을 두고 주기적으로 갱신
   - 여러 채널의 유튜브 수치를 합산하지 않음 → 랭킹과 홈의 시청자 합계에는 유튜브를 넣지 않고 LIVE 목록에만 표시
 
-### 3단계 — 키리누키 수집·분류 ← 다음 작업
+### 3단계 — 키리누키 수집·분류 ✅ 완료 (2026-11-11)
+
+남은 것 (필요해지면):
+- 비슷한 클립에 신경망 임베딩(예: multilingual-e5, 로컬 ONNX) — 지금은 분류 태그 + 글자 2-gram. 클립이 수천 개 쌓인 뒤 결과를 보고 판단
+- 분류 입력에 사용자 참여(4단계 태그 투표) 반영, 버튜버 이름 별칭(예: "리코" → 유즈하 리코) 사전
+- 키리누키 채널 발견을 검색 외에 영상 설명의 원본 링크로 넓히기
+
+처음 계획 (기록용):
 - 목표: "A 클립이 재밌다 → 같은 버튜버의 비슷한 클립 / 다른 버튜버의 비슷한 클립"을 찾아 주기
 - 키리누키 채널 발견: `search.list`(하루 100회 별도 한도)로 버튜버 이름 검색 → 채널을 등록해 두고 이후 새 영상은 RSS 로 추적
 - 분류: 누가 / 무엇을 / 어떤 순간 / 한 줄 요약 태그. Claude 헤드리스(구독)로 생성
@@ -82,7 +92,7 @@
 - 주제별 모음 페이지, 버튜버별 특징 태그
 - 범위: 상위 100~200명부터
 
-### 4단계 — 키리누키 참여 (로그인 기반)
+### 4단계 — 키리누키 참여 (로그인 기반) ← 다음 작업
 좋아요, 내 재생목록, 태그 투표
 
 ### 5단계 — 모아 보기·놀이

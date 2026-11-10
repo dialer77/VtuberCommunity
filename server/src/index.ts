@@ -11,6 +11,7 @@ import { migrateUserDb, userDbEnabled } from "./userdb/db";
 import { buildAgencyRoster, loadRosterSeed } from "./tags/roster";
 import { setAgencyRoster } from "./tags/catalog";
 import { startYoutubeSync } from "./youtube/sync";
+import { startClipSync } from "./clips/sync";
 
 function makeStore(): Store {
   switch (config.storeKind) {
@@ -69,6 +70,8 @@ if (store instanceof SqliteStore) {
   startAiJobs(store);
   // 유튜브 공식 채널 연동 — 매핑·RSS·라이브 (YOUTUBE_API_KEY 가 있을 때만)
   startYoutubeSync(store);
+  // 키리누키 채널 발견·RSS (CLIPS_ENABLED + YouTube 키). 분류는 위 Claude 작업
+  startClipSync(store);
 }
 
 // 수집 스케줄러

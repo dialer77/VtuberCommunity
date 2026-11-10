@@ -16,6 +16,9 @@ import type {
   PeriodRanking,
   RankingPeriod,
   RankingMetric,
+  Clip,
+  ClipDetail,
+  ClipTagCount,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -231,4 +234,38 @@ export async function fetchRisingFromBackend(
   if (!res.ok) throw new Error(`backend /api/rising ${res.status}`);
   const json = (await res.json()) as { rising?: RisingEntry[] };
   return json.rising ?? [];
+}
+
+/** 키리누키 목록 (버모아 분류 완료분, 최신순) */
+export async function fetchClips(q: {
+  tag?: string;
+  vtuber?: { platform: string; channelId: string };
+  limit?: number;
+  offset?: number;
+}): Promise<{ total: number; clips: Clip[] }> {
+  const sp = new URLSearchParams();
+  if (q.tag) sp.set("tag", q.tag);
+  if (q.vtuber) {
+    sp.set("platform", q.vtuber.platform);
+    sp.set("channelId", q.vtuber.channelId);
+  }
+  sp.set("limit", String(q.limit ?? 24));
+  sp.set("offset", String(q.offset ?? 0));
+  const res = await fetch(`${BASE}/api/clips?${sp}`, fetchInit());
+  if (!res.ok) throw new Error(`backend /api/clips ${res.status}`);
+  const json = (await res.json()) as { total?: number; clips?: Clip[] };
+  return { total: json.total ?? 0, clips: json.clips ?? [] };
+}
+
+export async function fetchClipTags(): Promise<ClipTagCount[]> {
+  const res = await fetch(`${BASE}/api/clips/tags`, fetchInit());
+  if (!res.ok) throw new Error(`backend /api/clips/tags ${res.status}`);
+  return ((await res.json()) as { tags?: ClipTagCount[] }).tags ?? [];
+}
+
+export async function fetchClip(videoId: string): Promise<ClipDetail | null> {
+  const res = await fetch(`${BASE}/api/clips/${encodeURIComponent(videoId)}`, fetchInit());
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`backend /api/clips/:id ${res.status}`);
+  return (await res.json()) as ClipDetail;
 }

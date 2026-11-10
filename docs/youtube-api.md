@@ -82,6 +82,34 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 auto "모라
 | 확인필요 (`pending`) | 후보가 여럿, 보조 채널만 있음, 예전 주소, `@핸들` 변환 실패, 다른 버튜버와 같은 채널(소속사·그룹 공용 채널일 수 있음 — 맞는 한 명만 `set`) |
 | 링크없음 (`nolink`) | 채널 정보에 유튜브 링크가 없음 — 공식 채널이 있으면 `set` 으로 지정 |
 
+## 4. 키리누키 수집·분류 (3단계)
+
+팬이 방송을 잘라 올린 클립을 모아 **누가 · 무엇을 · 어떤 순간 · 한 줄 요약**으로 분류하고, 클립마다 같은 버튜버·다른 버튜버의 비슷한 클립을 이어 줍니다. 화면은 `/clips`(모음·태그별), `/clips/<영상 ID>`(분류·비슷한 클립), 프로필의 **키리누키** 탭(클립으로 본 특징 태그 포함).
+
+켜는 조건: `CLIPS_ENABLED=1`(기본값은 `ISSUES_ENABLED` 를 따라감) + YouTube 키. 분류는 이슈 수집과 같은 Claude 구독 토큰을 씁니다.
+
+| 작업 | 주기 | 할당량 |
+| --- | --- | --- |
+| **채널 찾기** — 월간 시청시간 상위 150명 순서로 "이름 키리누키" 검색 (`search.list`). 결과에서 **채널 ID 만** 씀. 같은 채널 영상이 2개 이상이거나 채널 이름이 클립 채널 같으면 등록. 공식 채널·다시보기 채널은 제외. 버튜버당 30일에 한 번 | 15분마다 1회, 하루 `CLIPS_SEARCH_PER_DAY`(기본 20)회 | 1회 100단위로 셈 (하루 최대 2,000) |
+| **새 클립** — 키리누키 채널 RSS | 채널마다 3시간 | 0 |
+| **분류** — Claude 헤드리스(구독, 도구 없음)가 RSS 제목·설명만 보고 분류. 분류가 끝나면 설명은 지움 | 30분마다 50개 (대기 클립이 있을 때만) | 0 |
+| **남아 있는지 확인** — RSS 에서 빠진 지 20일 넘은 클립을 `videos.list` 로 확인, 없어졌으면 삭제. 30일 넘게 확인 못 한 클립도 삭제 | 30분마다 | 50개당 1단위 |
+
+- **정책**: 분류 입력은 RSS 제목·설명뿐입니다 (API 로 받은 데이터로 파생 데이터를 만들지 않음, III.E.4.h). 화면의 분류·요약에는 "버모아 분류 — YouTube 정보가 아님"을 표시합니다.
+- **자동 차단**: 자동 등록 채널에서 분류한 영상이 8개 이상이고 70% 넘게 클립이 아니면 차단합니다. 나중에 공식 채널로 연결된 채널도 빠집니다.
+- **비슷한 클립**: 주제(게임 이름 등)·카테고리·순간 태그가 겹치는 정도 + 제목·요약의 글자 2-gram 유사도. 서버 안에서 계산합니다 (별도 모델·패키지 없음).
+
+### 관리 (배포 PC)
+
+```powershell
+cd D:\01_Project\21_VtuberCommunity
+powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 status            # 채널·클립 개수, 오늘 검색 횟수, 마지막 분류
+powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 channels auto      # 자동 등록 채널 (클립/클립 아님 개수 포함)
+powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 recent 30          # 최근 분류 결과 확인
+powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 block "채널 이름"   # 클립 채널이 아니면 차단
+powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 add https://www.youtube.com/@채널 "유즈하 리코"   # 아는 키리누키 채널 직접 추가
+```
+
 ## 할당량
 
 | 항목 | 하루 기본 한도 |

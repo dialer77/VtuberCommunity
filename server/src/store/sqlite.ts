@@ -5,6 +5,7 @@ import type { Store } from "./types";
 import type { LiveSnapshot, Platform } from "../domain";
 import { hasDebutSignal } from "../detect/debut";
 import { YoutubeRepo } from "../youtube/store";
+import { ClipRepo } from "../clips/store";
 
 /** API가 반환하는 라이브 아이템 (웹 LiveStream 매핑이 쉬운 형태) */
 export interface LiveItem {
@@ -228,6 +229,8 @@ export class SqliteStore implements Store {
   private db: DatabaseSync;
   /** 유튜브 공식 채널 연동 (같은 DB 파일) */
   readonly youtube: YoutubeRepo;
+  /** 키리누키 (같은 DB 파일) */
+  readonly clips: ClipRepo;
 
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
@@ -235,6 +238,7 @@ export class SqliteStore implements Store {
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.migrate();
     this.youtube = new YoutubeRepo(this.db);
+    this.clips = new ClipRepo(this.db);
   }
 
   private migrate(): void {
@@ -1056,6 +1060,23 @@ export class SqliteStore implements Store {
       `)
       .run();
     return Number(res.changes);
+  }
+
+  /** 채널 ID → 이름 (처음 관측한 이름이 아니라 최근 일별 집계 이름 우선) */
+  channelNames(ids: string[]): Map<string, string> {
+    const out = new Map<string, string>();
+    const uniq = [...new Set(ids)];
+    if (uniq.length === 0) return out;
+    const ph = uniq.map(() => "?").join(",");
+    const rows = this.db
+      .prepare(`
+        SELECT c.channel_id AS id,
+          COALESCE((SELECT name FROM channel_daily d WHERE d.channel_id = c.channel_id ORDER BY date DESC LIMIT 1), c.name) AS name
+        FROM channels c WHERE c.channel_id IN (${ph})
+      `)
+      .all(...uniq) as unknown as Array<{ id: string; name: string }>;
+    for (const r of rows) out.set(r.id, r.name);
+    return out;
   }
 
   /** 채널의 마지막 방송 자가 태그 (유튜브 방송에 버튜버 태그를 붙일 때) */
