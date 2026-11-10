@@ -41,7 +41,7 @@
 ### 코드는 배포됐고, 사용자가 설정해야 켜지는 것
 배포 PC 작업은 RDP 로 사용자가 직접 실행합니다.
 
-- [ ] **YouTube API 키 등록**: 바탕화면 `youtube-key.txt` → `deploy\windows\setup-youtube.ps1`. 처음 발급한 키는 키 순환으로 새로 받은 뒤 등록할 것 (`docs/youtube-api.md`)
+- [x] **YouTube API 키 등록** (2026-11-10 완료): 배포 PC `server\.env` 의 `YOUTUBE_API_KEY`. 교체할 때는 바탕화면 `youtube-key.txt` → `deploy\windows\setup-youtube.ps1` (`docs/youtube-api.md`). 수집기가 아직 골격뿐이라 할당량은 쓰지 않는 중
 - [ ] **사용자 DB**: `deploy\windows\setup-userdb.ps1` (`docs/user-accounts.md` 1단계)
 - [ ] **구글 로그인**: Google OAuth 클라이언트 발급 → Vercel 환경변수 5개 → 재배포 (`docs/user-accounts.md` 2·3단계)
 - [ ] **이슈 수집 토큰 교체**: 사용자가 Claude 계정을 바꿀 예정이라 새 계정으로 다시 발급 — `deploy\windows\setup-issues.ps1 -RenewToken`
@@ -53,7 +53,7 @@
 
 ## 3. 다음 작업 (순서대로)
 
-### 2단계 — 유튜브 공식 채널 연동 (YouTube 키 등록 후 시작)
+### 2단계 — 유튜브 공식 채널 연동 ← 다음 작업 (키 등록 완료, 바로 시작 가능)
 - **채널 매핑**: 버튜버 ↔ 유튜브 공식 채널. 자동 추정 + 운영자 수동 확정·덮어쓰기. 상위 채널부터.
   - 후보 출처: 치지직·SOOP 채널 소개의 링크, 데뷔 수집 결과, `channels.list`(`forHandle`, 1단위)
 - **프로필 "공식 영상" 탭**: 최신 영상은 채널 RSS(`youtube.com/feeds/videos.xml?channel_id=…`, 할당량 0), 상세는 `videos.list` 50개 묶음(1단위). 재생은 기존 사이트 안 플레이어(`web/src/components/player/`).
