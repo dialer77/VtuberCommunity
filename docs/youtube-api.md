@@ -21,16 +21,21 @@
 
 ## 2. 배포 PC 에 등록
 
-RDP 로 접속해 **관리자 PowerShell** 에서 실행하고, 물어보면 키를 붙여넣습니다.
+RDP 로 배포 PC 에 접속해서 진행합니다.
+
+1. 메모장에 키 한 줄을 붙여넣고 **바탕화면에 `youtube-key.txt`** 로 저장합니다.
+2. **관리자 PowerShell** 에서 실행합니다.
 
 ```powershell
 cd D:\01_Project\21_VtuberCommunity
 powershell -ExecutionPolicy Bypass -File deploy\windows\setup-youtube.ps1
 ```
 
-YouTube 에 시험 요청을 1회 보내 키와 제한 설정을 확인한 뒤 `server\.env` 에 저장하고 서버를 재시작합니다. 실패하면 원인(사용 설정 안 됨, 리퍼러 제한, IP 제한 등)을 알려줍니다.
+스크립트가 바탕화면의 키 파일을 읽어 YouTube 에 시험 요청을 1회 보내고, 키와 제한 설정을 확인한 뒤 `server\.env` 에 저장하고 서버를 재시작합니다. 등록에 성공하면 **키 파일은 자동으로 지웁니다.** 실패하면 원인(사용 설정 안 됨, 리퍼러 제한, IP 제한 등)을 알려주고 키 파일은 남겨 둡니다.
 
-- 키 교체: 같은 스크립트를 다시 실행
+- 키 파일이 없으면 직접 입력을 받습니다. 붙여넣기는 마우스 오른쪽 클릭으로 합니다 (Ctrl+V 는 안 될 수 있음).
+- 다른 위치의 파일: `-KeyFile "경로"` / 클립보드: `-FromClipboard`
+- 키 교체: 새 키로 같은 방법을 반복
 - 연동 끄기: `-Disable`
 
 ## 할당량
