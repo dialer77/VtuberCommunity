@@ -8,10 +8,14 @@
     2. YouTube 에 시험 요청 1회 (할당량 1 소모) → 키·제한 설정 확인
     3. server\.env 에 YOUTUBE_API_KEY 저장 → 서버 재시작
 
+  붙여넣기: 이 창에서는 Ctrl+V 가 안 될 수 있다 → 마우스 오른쪽 클릭으로 붙여넣기.
+  그래도 안 되면 키를 복사해 둔 상태에서 -FromClipboard 로 실행.
+
   옵션
-    -Disable   키 삭제 (YouTube 연동 끄기)
+    -FromClipboard  입력 대신 클립보드의 키를 사용
+    -Disable        키 삭제 (YouTube 연동 끄기)
 #>
-param([switch]$Disable)
+param([switch]$Disable, [switch]$FromClipboard)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '_common.ps1')
 
@@ -44,14 +48,26 @@ if ($Disable) {
 # ------------------------------------------------------------------ 1. 키 입력
 Step 'API 키 입력'
 $saved = Get-EnvValue 'YOUTUBE_API_KEY'
-$prompt = '   YouTube API 키 붙여넣고 Enter (화면에 보이지 않음)'
-if ($saved) { $prompt = '   새 키 붙여넣고 Enter — 그냥 Enter 면 저장된 키를 다시 시험 (화면에 보이지 않음)' }
-$sec = Read-Host $prompt -AsSecureString
-$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-try { $key = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr).Trim() } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-if (-not $key) { $key = $saved }
-if (-not $key) { Fail '키가 비어 있습니다.' }
-if ($key -notmatch '^[A-Za-z0-9_-]{30,60}$') { Warn '키 형식이 예상과 다릅니다 (보통 AIza 로 시작하는 39자). 그대로 시험합니다.' }
+$pasteHelp = 'Ctrl+V 대신 마우스 오른쪽 클릭으로 붙여넣거나, 키를 복사한 뒤 -FromClipboard 를 붙여 실행하세요.'
+if ($FromClipboard) {
+  $key = "$(Get-Clipboard -Raw)"
+  Ok '클립보드에서 키를 읽었습니다.'
+} else {
+  Write-Host '   붙여넣기는 마우스 오른쪽 클릭 (Ctrl+V 는 이 창에서 안 될 수 있음). 별표(*)가 39개쯤 찍히면 정상.'
+  $prompt = '   YouTube API 키 붙여넣고 Enter (화면에 보이지 않음)'
+  if ($saved) { $prompt = '   새 키 붙여넣고 Enter — 그냥 Enter 면 저장된 키를 다시 시험 (화면에 보이지 않음)' }
+  $sec = Read-Host $prompt -AsSecureString
+  $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+  try { $key = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
+}
+# 공백·줄바꿈·제어 문자(Ctrl+V 가 그대로 들어간 경우 등) 제거
+$key = $key -replace '[\s\x00-\x1F\x7F]', ''
+if (-not $key -and -not $FromClipboard) { $key = $saved }
+if (-not $key) { Fail ('키가 비어 있습니다. {0}' -f $pasteHelp) }
+if ($key -notmatch '^[A-Za-z0-9_-]{30,60}$') {
+  Fail ('키 형식이 아닙니다 ({0}자). 붙여넣기가 제대로 안 된 것 같습니다. {1}' -f $key.Length, $pasteHelp)
+}
+if ($key -notmatch '^AIza[A-Za-z0-9_-]{35}$') { Warn ('보통 키는 AIza 로 시작하는 39자인데 {0}자입니다. 그대로 시험합니다.' -f $key.Length) }
 
 # ------------------------------------------------------------------ 2. 시험 요청
 Step '시험 요청 (YouTube 공식 채널 정보 1건, 할당량 1)'
@@ -72,6 +88,8 @@ try {
   } else {
     Fail ('YouTube 에 연결하지 못했습니다: {0}' -f $_.Exception.Message)
   }
+} catch {
+  Fail ('시험 요청 실패: {0}' -f $_.Exception.Message)
 }
 
 if ($status -eq 200) {
