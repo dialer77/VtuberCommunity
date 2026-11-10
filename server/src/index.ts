@@ -8,6 +8,7 @@ import type { Store } from "./store/types";
 import { log } from "./log";
 import { startAiJobs } from "./issues/scheduler";
 import { migrateUserDb, userDbEnabled } from "./userdb/db";
+import { allAggregates } from "./userdb/clips";
 import { buildAgencyRoster, loadRosterSeed } from "./tags/roster";
 import { setAgencyRoster } from "./tags/catalog";
 import { startYoutubeSync } from "./youtube/sync";
@@ -54,6 +55,12 @@ if (userDbEnabled()) {
   try {
     await migrateUserDb();
     log.info("사용자 DB 연결됨");
+    // 키리누키 좋아요·태그 투표 합계를 수집 DB 에 맞춘다 (수집 DB 를 새로 만들었어도 복구되게)
+    if (store instanceof SqliteStore) {
+      const agg = await allAggregates();
+      store.clips.replaceAggregates(agg.likes, agg.votes);
+      if (agg.likes.size || agg.votes.size) log.info(`키리누키 참여 합계: 좋아요 ${agg.likes.size}개 · 투표 ${agg.votes.size}개 클립`);
+    }
   } catch (e) {
     log.error(`사용자 DB 준비 실패: ${String(e)}`);
   }

@@ -8,6 +8,15 @@ export interface PlayerVideo {
   title: string;
   /** 채널·출처 이름 (선택) */
   channel?: string | null;
+  /** 이어서 재생할 영상 ID (내 재생목록 — 공식 임베드의 playlist 매개변수) */
+  queue?: string[];
+}
+
+/** 임베드 주소. 이어서 재생할 영상이 있으면 공식 playlist 매개변수로 (최대 50개) */
+function embedSrc(v: PlayerVideo): string {
+  const q = (v.queue ?? []).filter((id) => /^[\w-]{11}$/.test(id) && id !== v.id).slice(0, 50);
+  const list = q.length ? `&playlist=${q.join(",")}` : "";
+  return `https://www.youtube.com/embed/${encodeURIComponent(v.id)}?autoplay=1&rel=0&playsinline=1${list}`;
 }
 
 type Mode = "expanded" | "mini";
@@ -77,8 +86,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           >
             <div className="relative aspect-video bg-black">
               <iframe
-                key={video.id}
-                src={`https://www.youtube.com/embed/${encodeURIComponent(video.id)}?autoplay=1&rel=0&playsinline=1`}
+                key={`${video.id}:${video.queue?.length ?? 0}`}
+                src={embedSrc(video)}
                 title={video.title}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
@@ -89,7 +98,11 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-2 px-3 py-2">
               <div className="min-w-0 flex-1">
                 <p className={`font-semibold leading-snug truncate ${expanded ? "text-sm" : "text-xs"}`}>{video.title}</p>
-                {video.channel ? <p className="text-[11px] text-muted-2 truncate">{video.channel}</p> : null}
+                {video.channel || video.queue?.length ? (
+                  <p className="text-[11px] text-muted-2 truncate">
+                    {video.queue?.length ? `재생목록 · ${video.queue.length + 1}개 이어서 재생` : video.channel}
+                  </p>
+                ) : null}
               </div>
               <a
                 href={`https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`}

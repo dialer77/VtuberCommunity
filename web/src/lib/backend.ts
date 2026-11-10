@@ -239,12 +239,14 @@ export async function fetchRisingFromBackend(
 /** 키리누키 목록 (버모아 분류 완료분, 최신순) */
 export async function fetchClips(q: {
   tag?: string;
+  sort?: "likes";
   vtuber?: { platform: string; channelId: string };
   limit?: number;
   offset?: number;
 }): Promise<{ total: number; clips: Clip[] }> {
   const sp = new URLSearchParams();
   if (q.tag) sp.set("tag", q.tag);
+  if (q.sort) sp.set("sort", q.sort);
   if (q.vtuber) {
     sp.set("platform", q.vtuber.platform);
     sp.set("channelId", q.vtuber.channelId);

@@ -3,7 +3,10 @@
 //  clip_searches  버튜버별 마지막 검색 (search.list 는 비싸서 한 달에 한 번)
 //  clips          RSS 로 받은 클립 + 버모아 분류 (누가·무엇을·어떤 순간·한 줄 요약)
 //  clip_vtubers   클립에 나오는 버튜버 (주 채널 기준)
-//  clip_tags      분류 태그 (vocab.ts)
+//  clip_tags      분류 태그 (vocab.ts) — Claude 가 붙인 것
+//  clip_vote_tags 사용자 태그 투표 집계 (사용자 DB 에서 복사, 4단계)
+//  clip_tags_eff  화면·검색에 쓰는 태그 = Claude 태그 + 투표 반영 (뷰)
+//  clip_stats     좋아요 수 (사용자 DB 에서 복사)
 //
 // 정책(docs/youtube-api.md): 분류 입력은 RSS 제목·설명뿐 (API 데이터로 파생 데이터를 만들지 않음).
 // RSS 에서 빠진 클립은 20일마다 videos.list 로 남아 있는지 확인하고, 30일 넘게 확인 못 한 클립은 지운다.
@@ -42,6 +45,7 @@ export interface ClipRow {
   channelTitle: string | null;
   hintPlatform: Platform | null;
   hintChannelId: string | null;
+  likes: number;
 }
 
 export interface ClipClass {
@@ -54,7 +58,12 @@ export interface ClipClass {
   vtubers: { platform: Platform; channelId: string }[];
 }
 
+/** 태그 투표 반영 기준: Claude 태그는 반대가 찬성보다 이만큼 많으면 빼고, 없는 태그는 찬성이 이만큼 많으면 붙인다 */
+export const VOTE_MARGIN = 2;
+
 export interface ClipQuery {
+  /** new = 최신순(기본), likes = 좋아요순 */
+  sort?: "new" | "likes";
   tag?: string;
   vtuber?: { platform: Platform; channelId: string };
   limit: number;
@@ -124,6 +133,26 @@ export class ClipRepo {
         PRIMARY KEY (video_id, tag)
       );
       CREATE INDEX IF NOT EXISTS idx_clip_tags_tag ON clip_tags(tag);
+      CREATE TABLE IF NOT EXISTS clip_vote_tags (
+        video_id TEXT NOT NULL,
+        tag      TEXT NOT NULL,
+        up       INTEGER NOT NULL DEFAULT 0,
+        down     INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (video_id, tag)
+      );
+      CREATE TABLE IF NOT EXISTS clip_stats (
+        video_id TEXT PRIMARY KEY,
+        likes    INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_clip_stats_likes ON clip_stats(likes);
+      DROP VIEW IF EXISTS clip_tags_eff;
+      CREATE VIEW clip_tags_eff AS
+        SELECT t.video_id, t.tag FROM clip_tags t
+        WHERE NOT EXISTS (
+          SELECT 1 FROM clip_vote_tags v WHERE v.video_id = t.video_id AND v.tag = t.tag AND v.down - v.up >= ${VOTE_MARGIN}
+        )
+        UNION
+        SELECT v.video_id, v.tag FROM clip_vote_tags v WHERE v.up - v.down >= ${VOTE_MARGIN};
     `);
   }
 
@@ -287,7 +316,7 @@ export class ClipRepo {
     const vt = this.db
       .prepare(`SELECT video_id, platform, channel_id FROM clip_vtubers WHERE video_id IN (${ph}) ORDER BY position`)
       .all(...ids) as unknown as Array<{ video_id: string; platform: Platform; channel_id: string }>;
-    const tg = this.db.prepare(`SELECT video_id, tag FROM clip_tags WHERE video_id IN (${ph})`).all(...ids) as unknown as Array<{
+    const tg = this.db.prepare(`SELECT video_id, tag FROM clip_tags_eff WHERE video_id IN (${ph})`).all(...ids) as unknown as Array<{
       video_id: string;
       tag: string;
     }>;
@@ -316,6 +345,7 @@ export class ClipRepo {
         moments: (tgMap.get(id) ?? []).filter((t) => t !== category),
         vtubers: vtMap.get(id) ?? [],
         channelTitle: str(r.ch_title),
+        likes: Number(r.likes ?? 0),
         hintPlatform: (str(r.hint_platform) as Platform | null) ?? null,
         hintChannelId: str(r.hint_channel_id),
       };
@@ -325,8 +355,9 @@ export class ClipRepo {
   private selectClips(where: string, tail: string, params: unknown[]): ClipRow[] {
     const rows = this.db
       .prepare(`
-        SELECT c.*, ch.title AS ch_title, ch.hint_platform, ch.hint_channel_id
+        SELECT c.*, ch.title AS ch_title, ch.hint_platform, ch.hint_channel_id, COALESCE(st.likes, 0) AS likes
         FROM clips c JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
+        LEFT JOIN clip_stats st ON st.video_id = c.video_id
         WHERE ${where} ${tail}
       `)
       .all(...(params as never[])) as unknown as Array<Record<string, unknown>>;
@@ -393,7 +424,7 @@ export class ClipRepo {
     const conds = [VISIBLE];
     const params: unknown[] = [];
     if (q.tag) {
-      conds.push(`EXISTS (SELECT 1 FROM clip_tags t WHERE t.video_id = c.video_id AND t.tag = ?)`);
+      conds.push(`EXISTS (SELECT 1 FROM clip_tags_eff t WHERE t.video_id = c.video_id AND t.tag = ?)`);
       params.push(q.tag);
     }
     if (q.vtuber) {
@@ -408,7 +439,8 @@ export class ClipRepo {
           .get(...(params as never[])) as { n: number }
       ).n,
     );
-    const clips = this.selectClips(where, `ORDER BY c.published_at DESC LIMIT ? OFFSET ?`, [...params, q.limit, q.offset]);
+    const order = q.sort === "likes" ? `COALESCE(st.likes, 0) DESC, c.published_at DESC` : `c.published_at DESC`;
+    const clips = this.selectClips(where, `ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, q.limit, q.offset]);
     return { total, clips };
   }
 
@@ -423,7 +455,7 @@ export class ClipRepo {
       for (const v of vt) params.push(v.platform, v.channelId);
     }
     if (tags.length) {
-      ors.push(`EXISTS (SELECT 1 FROM clip_tags t WHERE t.video_id = c.video_id AND t.tag IN (${tags.map(() => "?").join(",")}))`);
+      ors.push(`EXISTS (SELECT 1 FROM clip_tags_eff t WHERE t.video_id = c.video_id AND t.tag IN (${tags.map(() => "?").join(",")}))`);
       params.push(...tags);
     }
     if (clip.topic) {
@@ -443,7 +475,7 @@ export class ClipRepo {
       vtuber
         ? this.db
             .prepare(`
-              SELECT t.tag, COUNT(*) AS n FROM clip_tags t
+              SELECT t.tag, COUNT(*) AS n FROM clip_tags_eff t
               JOIN clips c ON c.video_id = t.video_id JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
               JOIN clip_vtubers v ON v.video_id = c.video_id AND v.platform = ? AND v.channel_id = ?
               WHERE ${VISIBLE} GROUP BY t.tag
@@ -451,7 +483,7 @@ export class ClipRepo {
             .all(vtuber.platform, vtuber.channelId)
         : this.db
             .prepare(`
-              SELECT t.tag, COUNT(*) AS n FROM clip_tags t
+              SELECT t.tag, COUNT(*) AS n FROM clip_tags_eff t
               JOIN clips c ON c.video_id = t.video_id JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
               WHERE ${VISIBLE} GROUP BY t.tag
             `)
@@ -524,6 +556,74 @@ export class ClipRepo {
     this.db.prepare(`DELETE FROM clips WHERE video_id = ?`).run(videoId);
     this.db.prepare(`DELETE FROM clip_vtubers WHERE video_id = ?`).run(videoId);
     this.db.prepare(`DELETE FROM clip_tags WHERE video_id = ?`).run(videoId);
+    this.db.prepare(`DELETE FROM clip_vote_tags WHERE video_id = ?`).run(videoId);
+    this.db.prepare(`DELETE FROM clip_stats WHERE video_id = ?`).run(videoId);
+  }
+
+  // ---------------------------------------------------------------- 참여 집계 (사용자 DB → 복사)
+
+  setLikes(videoId: string, likes: number): void {
+    this.db
+      .prepare(`INSERT INTO clip_stats (video_id, likes) VALUES (?, ?) ON CONFLICT(video_id) DO UPDATE SET likes = excluded.likes`)
+      .run(videoId, Math.max(0, likes));
+  }
+
+  setVoteAgg(videoId: string, agg: { tag: string; up: number; down: number }[]): void {
+    this.db.exec("BEGIN");
+    try {
+      this.db.prepare(`DELETE FROM clip_vote_tags WHERE video_id = ?`).run(videoId);
+      const ins = this.db.prepare(`INSERT INTO clip_vote_tags (video_id, tag, up, down) VALUES (?, ?, ?, ?)`);
+      for (const a of agg) if (a.up || a.down) ins.run(videoId, a.tag, a.up, a.down);
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+
+  /** 서버 시작 시 사용자 DB 의 전체 합계로 맞춘다 */
+  replaceAggregates(likes: Map<string, number>, votes: Map<string, { tag: string; up: number; down: number }[]>): void {
+    this.db.exec("BEGIN");
+    try {
+      this.db.exec(`DELETE FROM clip_stats; DELETE FROM clip_vote_tags;`);
+      const l = this.db.prepare(`INSERT INTO clip_stats (video_id, likes) VALUES (?, ?)`);
+      for (const [id, n] of likes) l.run(id, n);
+      const v = this.db.prepare(`INSERT INTO clip_vote_tags (video_id, tag, up, down) VALUES (?, ?, ?, ?)`);
+      for (const [id, list] of votes) for (const a of list) v.run(id, a.tag, a.up, a.down);
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+
+  /** 클립의 Claude 태그(순간)와 투표 집계 — 상세 화면의 태그 투표 */
+  tagVoteView(videoId: string): { tag: string; ai: boolean; up: number; down: number }[] {
+    const ai = new Set(
+      (this.db.prepare(`SELECT tag FROM clip_tags WHERE video_id = ?`).all(videoId) as unknown as Array<{ tag: string }>).map((r) => r.tag),
+    );
+    const votes = this.db.prepare(`SELECT tag, up, down FROM clip_vote_tags WHERE video_id = ?`).all(videoId) as unknown as Array<{
+      tag: string;
+      up: number;
+      down: number;
+    }>;
+    const out = new Map<string, { tag: string; ai: boolean; up: number; down: number }>();
+    for (const t of ai) out.set(t, { tag: t, ai: true, up: 0, down: 0 });
+    for (const v of votes) out.set(v.tag, { tag: v.tag, ai: ai.has(v.tag), up: Number(v.up), down: Number(v.down) });
+    return [...out.values()];
+  }
+
+  /** 영상 ID 목록 → 보이는 클립 (순서 유지, 없어진 클립은 빠짐) */
+  clipsByIds(ids: string[]): ClipRow[] {
+    if (ids.length === 0) return [];
+    const rows = this.selectClips(`c.video_id IN (${ids.map(() => "?").join(",")}) AND ${VISIBLE}`, "", ids);
+    const byId = new Map(rows.map((r) => [r.videoId, r]));
+    return ids.map((id) => byId.get(id)).filter((r): r is ClipRow => !!r);
+  }
+
+  /** 좋아요·투표·재생목록에 담을 수 있는 클립인지 (분류 완료 + 차단 안 됨) */
+  isVisible(videoId: string): boolean {
+    return !!this.getClip(videoId);
   }
 
   /** 정리: 30일 넘게 RSS·API 로 확인하지 못한 클립, 차단된 채널의 클립을 지운다 */

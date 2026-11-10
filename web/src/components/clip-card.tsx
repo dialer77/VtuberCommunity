@@ -49,6 +49,7 @@ export function ClipCard({ clip }: { clip: Clip }) {
       <span className="text-xs text-muted-2 truncate">
         {who ? `${who} · ` : ""}
         {clip.channelTitle ?? "YouTube"} · {formatDate(clip.publishedAt)}
+        {clip.likes ? <span className="text-accent"> · ♥ {clip.likes}</span> : null}
       </span>
     </div>
   );

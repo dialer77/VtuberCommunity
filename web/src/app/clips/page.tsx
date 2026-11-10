@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 24;
 
-type Search = Promise<{ tag?: string; v?: string; page?: string }>;
+type Search = Promise<{ tag?: string; v?: string; page?: string; sort?: string }>;
 
 /** ?v=chzzk:<채널ID> → 버튜버 필터 */
 function parseVtuber(v: string | undefined): { platform: string; channelId: string } | undefined {
@@ -17,10 +17,11 @@ function parseVtuber(v: string | undefined): { platform: string; channelId: stri
   return m ? { platform: m[1]!, channelId: m[2]! } : undefined;
 }
 
-function href(q: { tag?: string; v?: string; page?: number }): string {
+function href(q: { tag?: string; v?: string; page?: number; sort?: string }): string {
   const sp = new URLSearchParams();
   if (q.tag) sp.set("tag", q.tag);
   if (q.v) sp.set("v", q.v);
+  if (q.sort === "likes") sp.set("sort", "likes");
   if (q.page && q.page > 1) sp.set("page", String(q.page));
   const s = sp.toString();
   return s ? `/clips?${s}` : "/clips";
@@ -38,7 +39,7 @@ export async function generateMetadata({ searchParams }: { searchParams: Search 
   };
 }
 
-function TagRow({ title, tags, active, v }: { title: string; tags: ClipTagCount[]; active?: string; v?: string }) {
+function TagRow({ title, tags, active, v, sort }: { title: string; tags: ClipTagCount[]; active?: string; v?: string; sort?: string }) {
   const shown = tags.filter((t) => t.count > 0 || t.id === active);
   if (shown.length === 0) return null;
   return (
@@ -47,7 +48,7 @@ function TagRow({ title, tags, active, v }: { title: string; tags: ClipTagCount[
       {shown.map((t) => (
         <Link
           key={t.id}
-          href={href({ tag: active === t.id ? undefined : t.id, v })}
+          href={href({ tag: active === t.id ? undefined : t.id, v, sort })}
           scroll={false}
           className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
             active === t.id
@@ -63,12 +64,13 @@ function TagRow({ title, tags, active, v }: { title: string; tags: ClipTagCount[
 }
 
 export default async function ClipsPage({ searchParams }: { searchParams: Search }) {
-  const { tag, v, page: pageRaw } = await searchParams;
+  const { tag, v, page: pageRaw, sort: sortRaw } = await searchParams;
+  const sort = sortRaw === "likes" ? "likes" : undefined;
   const page = Math.max(1, Number(pageRaw) || 1);
   const vtuber = parseVtuber(v);
   const [tags, { total, clips }] = await Promise.all([
     getClipTags(),
-    getClips({ tag, vtuber, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
+    getClips({ tag, vtuber, sort, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
   ]);
   const activeTag = tags.find((t) => t.id === tag);
   const vName = vtuber ? clips.flatMap((c) => c.vtubers).find((x) => x.channelId === vtuber.channelId)?.name : undefined;
@@ -94,8 +96,28 @@ export default async function ClipsPage({ searchParams }: { searchParams: Search
       ) : null}
 
       <div className="flex flex-col gap-2">
-        <TagRow title="무엇을" tags={tags.filter((t) => t.kind === "category")} active={tag} v={v} />
-        <TagRow title="어떤 순간" tags={tags.filter((t) => t.kind === "moment")} active={tag} v={v} />
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-2 w-14 shrink-0">정렬</span>
+          {[
+            { id: undefined, label: "최신순" },
+            { id: "likes", label: "좋아요순" },
+          ].map((o) => (
+            <Link
+              key={o.label}
+              href={href({ tag, v, sort: o.id })}
+              scroll={false}
+              className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                sort === o.id
+                  ? "border-accent bg-accent text-accent-fg font-semibold"
+                  : "border-border bg-surface text-muted hover:border-accent/50 hover:text-foreground"
+              }`}
+            >
+              {o.label}
+            </Link>
+          ))}
+        </div>
+        <TagRow title="무엇을" tags={tags.filter((t) => t.kind === "category")} active={tag} v={v} sort={sort} />
+        <TagRow title="어떤 순간" tags={tags.filter((t) => t.kind === "moment")} active={tag} v={v} sort={sort} />
       </div>
 
       {clips.length === 0 ? (
@@ -109,7 +131,7 @@ export default async function ClipsPage({ searchParams }: { searchParams: Search
       {pages > 1 ? (
         <nav className="flex items-center justify-center gap-3 text-sm" aria-label="페이지">
           {page > 1 ? (
-            <Link href={href({ tag, v, page: page - 1 })} className="rounded-md border border-border px-3 py-1.5 hover:border-accent/60">
+            <Link href={href({ tag, v, sort, page: page - 1 })} className="rounded-md border border-border px-3 py-1.5 hover:border-accent/60">
               ← 이전
             </Link>
           ) : null}
@@ -117,7 +139,7 @@ export default async function ClipsPage({ searchParams }: { searchParams: Search
             {page} / {pages}
           </span>
           {page < pages ? (
-            <Link href={href({ tag, v, page: page + 1 })} className="rounded-md border border-border px-3 py-1.5 hover:border-accent/60">
+            <Link href={href({ tag, v, sort, page: page + 1 })} className="rounded-md border border-border px-3 py-1.5 hover:border-accent/60">
               다음 →
             </Link>
           ) : null}

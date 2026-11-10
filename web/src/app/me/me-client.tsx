@@ -7,6 +7,7 @@ import { AUTH_ON, useFavorites } from "@/components/auth/auth-providers";
 import { PlatformBadge } from "@/components/platform-badge";
 import { Avatar } from "@/components/avatar";
 import { disablePush, enablePush, getPushState, type PushState } from "@/lib/push-client";
+import { MyLikes, MyPlaylists } from "./my-clips";
 
 function PushPanel() {
   const [state, setState] = useState<PushState | null>(null);
@@ -106,7 +107,7 @@ function FavoriteList() {
 function AccountPanel() {
   const [busy, setBusy] = useState(false);
   const withdraw = async () => {
-    if (!window.confirm("탈퇴하면 최애와 알림 설정이 모두 삭제되고 되돌릴 수 없어요. 탈퇴할까요?")) return;
+    if (!window.confirm("탈퇴하면 최애·알림 설정·좋아요·재생목록·태그 투표가 모두 삭제되고 되돌릴 수 없어요. 탈퇴할까요?")) return;
     setBusy(true);
     const reg = await navigator.serviceWorker?.getRegistration("/").catch(() => undefined);
     await (await reg?.pushManager.getSubscription())?.unsubscribe().catch(() => undefined);
@@ -145,7 +146,7 @@ function Inner() {
   if (status !== "authenticated") {
     return (
       <div className="flex flex-col items-start gap-3 rounded-xl border border-border bg-surface p-5">
-        <p className="text-sm text-muted">로그인하면 최애를 등록하고 방송 시작 알림을 받을 수 있어요.</p>
+        <p className="text-sm text-muted">로그인하면 최애·방송 시작 알림, 클립 좋아요·재생목록·태그 투표를 쓸 수 있어요.</p>
         <button
           type="button"
           onClick={() => signIn("google", { callbackUrl: "/me" })}
@@ -168,6 +169,8 @@ function Inner() {
         <h2 className="font-bold">내 최애</h2>
         <FavoriteList />
       </section>
+      <MyPlaylists />
+      <MyLikes />
       <AccountPanel />
     </div>
   );

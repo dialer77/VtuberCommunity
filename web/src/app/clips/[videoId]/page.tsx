@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getClip } from "@/lib/data";
+import { getClip, getClipTags } from "@/lib/data";
 import { PlayVideo } from "@/components/player/play-video";
 import { RemoteImage } from "@/components/remote-image";
 import { ClipGrid, ClipNotice, ClipTagChip } from "@/components/clip-card";
 import { formatDate } from "@/lib/format";
+import { ClipActions } from "@/components/clip-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 export default async function ClipPage({ params }: { params: Params }) {
   const { videoId } = await params;
-  const d = await getClip(videoId);
+  const [d, tags] = await Promise.all([getClip(videoId), getClipTags()]);
   if (!d) notFound();
   const c = d.clip;
 
@@ -64,6 +65,14 @@ export default async function ClipPage({ params }: { params: Params }) {
           · {formatDate(c.publishedAt)}
         </p>
       </div>
+
+      <ClipActions
+        videoId={c.videoId}
+        likes={c.likes ?? 0}
+        tagVotes={d.tagVotes ?? []}
+        allMoments={tags.filter((t) => t.kind === "moment")}
+        margin={d.voteMargin ?? 2}
+      />
 
       <section className="flex flex-col gap-2.5 rounded-xl border border-border bg-surface p-4" aria-label="버모아 분류">
         <p className="text-xs font-bold text-muted">버모아 분류</p>

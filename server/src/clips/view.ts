@@ -2,7 +2,8 @@
 import type { SqliteStore } from "../store/sqlite";
 import type { Platform } from "../domain";
 import type { ClipRow } from "./store";
-import { CLIP_TAGS, clipTagById, type ClipTagDef } from "./vocab";
+import { CLIP_TAGS, MOMENT_IDS, clipTagById, type ClipTagDef } from "./vocab";
+import { VOTE_MARGIN } from "./store";
 import { findSimilar } from "./similar";
 import { ytChannelUrl, ytThumb } from "../youtube/view";
 
@@ -25,6 +26,8 @@ export interface ClipOut {
   moments: ClipTagOut[];
   topic: string | null;
   summary: string | null;
+  /** 버모아 좋아요 수 */
+  likes: number;
 }
 
 const tagOut = (id: string | null): ClipTagOut | null => {
@@ -46,6 +49,7 @@ export function toClipOuts(store: SqliteStore, rows: ClipRow[]): ClipOut[] {
     moments: r.moments.map(tagOut).filter((t): t is ClipTagOut => !!t),
     topic: r.topic,
     summary: r.summary,
+    likes: r.likes,
   }));
 }
 
@@ -61,7 +65,13 @@ export function clipDetail(store: SqliteStore, videoId: string) {
   if (!row) return null;
   const { same, other } = findSimilar(store.clips, row);
   const [clip, ...rest] = toClipOuts(store, [row, ...same, ...other]);
-  return { clip: clip!, sameVtuber: rest.slice(0, same.length), otherVtuber: rest.slice(same.length) };
+  return {
+    clip: clip!,
+    sameVtuber: rest.slice(0, same.length),
+    otherVtuber: rest.slice(same.length),
+    tagVotes: clipTagVotes(store, videoId),
+    voteMargin: VOTE_MARGIN,
+  };
 }
 
 /** 프로필의 키리누키 요약: 개수 · 최근 클립 · 자주 나오는 순간/카테고리 · 자주 하는 것(주제) */
@@ -80,4 +90,18 @@ export function clipsForProfile(store: SqliteStore, platform: Platform, channelI
     traits,
     topics: store.clips.topTopics(vtuber, 5).filter((t) => t.count >= 2),
   };
+}
+
+/** 태그 투표 화면: '어떤 순간' 태그마다 Claude 가 붙였는지 · 찬반 수 · 지금 보이는지 */
+export function clipTagVotes(store: SqliteStore, videoId: string) {
+  return store.clips
+    .tagVoteView(videoId)
+    .filter((v) => MOMENT_IDS.includes(v.tag))
+    .map((v) => ({
+      ...tagOut(v.tag)!,
+      ai: v.ai,
+      up: v.up,
+      down: v.down,
+      shown: v.ai ? v.down - v.up < VOTE_MARGIN : v.up - v.down >= VOTE_MARGIN,
+    }));
 }

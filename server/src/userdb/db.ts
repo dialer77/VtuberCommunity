@@ -65,6 +65,42 @@ const MIGRATIONS: { id: number; sql: string }[] = [
       CREATE INDEX idx_sent_recent ON notifications_sent(user_id, channel_id, sent_at);
     `,
   },
+  {
+    // 4단계 키리누키 참여: 좋아요 · 내 재생목록 · 태그 투표 (영상은 유튜브 영상 ID 로만 가리킨다)
+    id: 2,
+    sql: `
+      CREATE TABLE clip_likes (
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        video_id   TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (user_id, video_id)
+      );
+      CREATE INDEX idx_clip_likes_video ON clip_likes(video_id);
+      CREATE TABLE playlists (
+        id         BIGSERIAL PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title      TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX idx_playlists_user ON playlists(user_id);
+      CREATE TABLE playlist_items (
+        playlist_id BIGINT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+        video_id    TEXT NOT NULL,
+        added_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (playlist_id, video_id)
+      );
+      CREATE TABLE clip_tag_votes (
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        video_id   TEXT NOT NULL,
+        tag        TEXT NOT NULL,
+        vote       SMALLINT NOT NULL CHECK (vote IN (-1, 1)),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (user_id, video_id, tag)
+      );
+      CREATE INDEX idx_clip_tag_votes_video ON clip_tag_votes(video_id);
+    `,
+  },
 ];
 
 /** 아직 적용되지 않은 스키마 변경을 순서대로 적용 */

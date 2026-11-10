@@ -296,12 +296,42 @@ export interface Clip {
   moments: ClipTag[];
   /** 한 줄 요약 (버모아) */
   summary: string | null;
+  /** 버모아 좋아요 수 */
+  likes?: number;
 }
 
 export interface ClipDetail {
   clip: Clip;
   sameVtuber: Clip[];
   otherVtuber: Clip[];
+  /** '어떤 순간' 태그 투표 현황 */
+  tagVotes?: ClipTagVote[];
+  /** 찬반이 이만큼 차이 나면 분류에 반영 */
+  voteMargin?: number;
+}
+
+/** 태그 투표 현황: Claude 가 붙였는지 · 찬반 수 · 지금 분류에 보이는지 */
+export interface ClipTagVote extends ClipTag {
+  ai: boolean;
+  up: number;
+  down: number;
+  shown: boolean;
+}
+
+/** 내 재생목록 요약 */
+export interface PlaylistSummary {
+  id: number;
+  title: string;
+  count: number;
+  updatedAt: string;
+  firstVideoId: string | null;
+}
+
+/** 클립 하나에 대한 내 상태 */
+export interface MyClipState {
+  liked: boolean;
+  votes: Record<string, number>;
+  playlists: (PlaylistSummary & { has: boolean })[];
 }
 
 /** 프로필의 키리누키 요약 */

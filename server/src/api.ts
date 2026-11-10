@@ -12,7 +12,25 @@ import {
 } from "./tags/catalog";
 import { curatedProfile } from "./profiles";
 import { youtubeForProfile, youtubeLiveItems } from "./youtube/view";
-import { clipDetail, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
+import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
+import { MOMENT_IDS } from "./clips/vocab";
+import {
+  MAX_TITLE,
+  addToPlaylist,
+  createPlaylist,
+  deletePlaylist,
+  getPlaylist,
+  likeCount,
+  listLikes,
+  listPlaylists,
+  myClipState,
+  removeFromPlaylist,
+  renamePlaylist,
+  setLike,
+  setTagVote,
+  userTouchedVideos,
+  voteAgg,
+} from "./userdb/clips";
 import { clipTagById } from "./clips/vocab";
 import { config } from "./config";
 import { VERSION, STARTED_AT } from "./version";
@@ -151,7 +169,7 @@ export function buildApi(store: SqliteStore) {
 
   // 키리누키 (버모아 분류). ?tag=<분류 태그>&platform=&channelId=&limit=24&offset=0
   app.get("/api/clips", async (req) => {
-    const q = req.query as { tag?: string; platform?: string; channelId?: string; limit?: string; offset?: string };
+    const q = req.query as { tag?: string; platform?: string; channelId?: string; limit?: string; offset?: string; sort?: string };
     const limit = Math.min(60, Math.max(1, Number(q.limit) || 24));
     const offset = Math.max(0, Number(q.offset) || 0);
     const vtuber =
@@ -159,7 +177,7 @@ export function buildApi(store: SqliteStore) {
         ? { platform: q.platform as Platform, channelId: q.channelId }
         : undefined;
     const tag = q.tag && clipTagById(q.tag) ? q.tag : undefined;
-    const r = store.clips.listClips({ tag, vtuber, limit, offset });
+    const r = store.clips.listClips({ tag, vtuber, limit, offset, sort: q.sort === "likes" ? "likes" : "new" });
     return { total: r.total, clips: toClipOuts(store, r.clips) };
   });
 
@@ -277,7 +295,142 @@ export function buildApi(store: SqliteStore) {
   // 탈퇴 — 사용자 데이터 전부 삭제
   app.delete("/api/user/:userId", async (req, reply) => {
     if (!checkInternal(req, reply)) return reply;
-    await deleteUser((req.params as { userId: string }).userId);
+    const { userId } = req.params as { userId: string };
+    // 좋아요·태그 투표 합계에서도 빠지게 다시 계산
+    const touched = await userTouchedVideos(userId);
+    await deleteUser(userId);
+    for (const id of touched) {
+      store.clips.setLikes(id, await likeCount(id));
+      store.clips.setVoteAgg(id, await voteAgg(id));
+    }
+    return { ok: true };
+  });
+
+  // ---- 키리누키 참여 (4단계): 좋아요 · 태그 투표 · 내 재생목록 (공유 시크릿 보호)
+  const isId = (v: string) => /^[\w-]{11}$/.test(v);
+  const playlistId = (v: string) => (/^\d{1,12}$/.test(v) ? Number(v) : null);
+  const cleanTitle = (v: unknown) => {
+    const t = typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "";
+    return t.length >= 1 && t.length <= MAX_TITLE ? t : null;
+  };
+
+  // 클립 하나에 대한 내 상태 (좋아요 · 내 투표 · 재생목록에 담겼는지)
+  app.get("/api/user/:userId/clip/:videoId", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, videoId } = req.params as { userId: string; videoId: string };
+    if (!isId(videoId)) return reply.code(400).send({ error: "invalid_video" });
+    return myClipState(userId, videoId);
+  });
+
+  app.put("/api/user/:userId/likes/:videoId", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, videoId } = req.params as { userId: string; videoId: string };
+    if (!isId(videoId) || !store.clips.isVisible(videoId)) return reply.code(404).send({ error: "not_found" });
+    const r = await setLike(userId, videoId, true);
+    if (r === "limit") return reply.code(409).send({ error: "like_limit" });
+    store.clips.setLikes(videoId, r);
+    return { liked: true, likes: r };
+  });
+
+  app.delete("/api/user/:userId/likes/:videoId", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, videoId } = req.params as { userId: string; videoId: string };
+    if (!isId(videoId)) return reply.code(400).send({ error: "invalid_video" });
+    const r = (await setLike(userId, videoId, false)) as number;
+    store.clips.setLikes(videoId, r);
+    return { liked: false, likes: r };
+  });
+
+  // 내가 좋아요한 클립
+  app.get("/api/user/:userId/likes", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId } = req.params as { userId: string };
+    const q = req.query as { limit?: string; offset?: string };
+    const limit = Math.min(60, Math.max(1, Number(q.limit) || 24));
+    const offset = Math.max(0, Number(q.offset) || 0);
+    const r = await listLikes(userId, limit, offset);
+    return { total: r.total, clips: toClipOuts(store, store.clips.clipsByIds(r.videoIds)) };
+  });
+
+  // 태그 투표: { tag, vote: 1 | -1 | 0 } — '어떤 순간' 태그만
+  app.put("/api/user/:userId/votes/:videoId", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, videoId } = req.params as { userId: string; videoId: string };
+    const b = (req.body ?? {}) as { tag?: unknown; vote?: unknown };
+    const tag = typeof b.tag === "string" && MOMENT_IDS.includes(b.tag) ? b.tag : null;
+    const vote = b.vote === 1 || b.vote === -1 || b.vote === 0 ? b.vote : null;
+    if (!tag || vote === null) return reply.code(400).send({ error: "invalid_vote" });
+    if (!isId(videoId) || !store.clips.isVisible(videoId)) return reply.code(404).send({ error: "not_found" });
+    const agg = await setTagVote(userId, videoId, tag, vote);
+    store.clips.setVoteAgg(videoId, agg);
+    return { tagVotes: clipTagVotes(store, videoId) };
+  });
+
+  // 내 재생목록
+  app.get("/api/user/:userId/playlists", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    return { playlists: await listPlaylists((req.params as { userId: string }).userId) };
+  });
+
+  // 새 재생목록 { title, videoId? } — videoId 를 주면 바로 담는다
+  app.post("/api/user/:userId/playlists", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId } = req.params as { userId: string };
+    const b = (req.body ?? {}) as { title?: unknown; videoId?: unknown };
+    const title = cleanTitle(b.title);
+    if (!title) return reply.code(400).send({ error: "invalid_title" });
+    const videoId = typeof b.videoId === "string" && isId(b.videoId) && store.clips.isVisible(b.videoId) ? b.videoId : null;
+    const id = await createPlaylist(userId, title);
+    if (id === null) return reply.code(409).send({ error: "playlist_limit" });
+    if (videoId) await addToPlaylist(userId, id, videoId);
+    return { id };
+  });
+
+  app.get("/api/user/:userId/playlists/:id", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, id } = req.params as { userId: string; id: string };
+    const pid = playlistId(id);
+    const p = pid === null ? null : await getPlaylist(userId, pid);
+    if (!p) return reply.code(404).send({ error: "not_found" });
+    // 사라진 클립(삭제·비공개·차단)은 목록에서 빠진다
+    return { id: p.id, title: p.title, total: p.videoIds.length, clips: toClipOuts(store, store.clips.clipsByIds(p.videoIds)) };
+  });
+
+  app.patch("/api/user/:userId/playlists/:id", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, id } = req.params as { userId: string; id: string };
+    const title = cleanTitle((req.body as { title?: unknown } | undefined)?.title);
+    const pid = playlistId(id);
+    if (!title || pid === null) return reply.code(400).send({ error: "invalid_title" });
+    if (!(await renamePlaylist(userId, pid, title))) return reply.code(404).send({ error: "not_found" });
+    return { ok: true };
+  });
+
+  app.delete("/api/user/:userId/playlists/:id", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, id } = req.params as { userId: string; id: string };
+    const pid = playlistId(id);
+    if (pid === null || !(await deletePlaylist(userId, pid))) return reply.code(404).send({ error: "not_found" });
+    return { ok: true };
+  });
+
+  app.put("/api/user/:userId/playlists/:id/items/:videoId", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, id, videoId } = req.params as { userId: string; id: string; videoId: string };
+    const pid = playlistId(id);
+    if (pid === null || !isId(videoId) || !store.clips.isVisible(videoId)) return reply.code(404).send({ error: "not_found" });
+    const r = await addToPlaylist(userId, pid, videoId);
+    if (r === "not_found") return reply.code(404).send({ error: "not_found" });
+    if (r === "limit") return reply.code(409).send({ error: "playlist_item_limit" });
+    return { ok: true };
+  });
+
+  app.delete("/api/user/:userId/playlists/:id/items/:videoId", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId, id, videoId } = req.params as { userId: string; id: string; videoId: string };
+    const pid = playlistId(id);
+    if (pid === null || !isId(videoId)) return reply.code(400).send({ error: "invalid" });
+    await removeFromPlaylist(userId, pid, videoId);
     return { ok: true };
   });
 
