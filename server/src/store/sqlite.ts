@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import type { Store } from "./types";
 import type { LiveSnapshot, Platform } from "../domain";
 import { hasDebutSignal } from "../detect/debut";
+import { YoutubeRepo } from "../youtube/store";
 
 /** API가 반환하는 라이브 아이템 (웹 LiveStream 매핑이 쉬운 형태) */
 export interface LiveItem {
@@ -225,12 +226,15 @@ export function channelUrl(platform: Platform, channelId: string): string {
  */
 export class SqliteStore implements Store {
   private db: DatabaseSync;
+  /** 유튜브 공식 채널 연동 (같은 DB 파일) */
+  readonly youtube: YoutubeRepo;
 
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
     this.db = new DatabaseSync(dbPath);
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.migrate();
+    this.youtube = new YoutubeRepo(this.db);
   }
 
   private migrate(): void {
@@ -1052,6 +1056,14 @@ export class SqliteStore implements Store {
       `)
       .run();
     return Number(res.changes);
+  }
+
+  /** 채널의 마지막 방송 자가 태그 (유튜브 방송에 버튜버 태그를 붙일 때) */
+  lastRawTags(channelId: string): string[] {
+    const r = this.db
+      .prepare(`SELECT tags FROM broadcast_tags WHERE channel_id = ? ORDER BY started_at DESC LIMIT 1`)
+      .get(channelId) as { tags: string } | undefined;
+    return parseTags(r?.tags);
   }
 
   /** 최근 N일 방송별 자가 태그 */

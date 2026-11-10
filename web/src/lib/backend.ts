@@ -39,6 +39,8 @@ interface BackendLive {
   thumbnailUrl: string | null;
   channelUrl: string;
   tags: VmoaTag[];
+  videoId?: string;
+  profilePlatform?: Platform;
 }
 
 interface BackendDebut {
@@ -66,7 +68,7 @@ export async function fetchLivesFromBackend(
   if (!res.ok) throw new Error(`backend /api/lives ${res.status}`);
   const json = (await res.json()) as { lives?: BackendLive[] };
   return (json.lives ?? []).map((l) => ({
-    id: `${l.platform}-${l.channelId}`,
+    id: l.videoId ? `youtube-${l.videoId}` : `${l.platform}-${l.channelId}`,
     vtuberId: l.channelId,
     vtuberName: l.channelName,
     platform: l.platform,
@@ -77,6 +79,7 @@ export async function fetchLivesFromBackend(
     thumbnailUrl: l.thumbnailUrl,
     channelUrl: l.channelUrl,
     tags: l.tags ?? [],
+    ...(l.videoId ? { videoId: l.videoId, profilePlatform: l.profilePlatform ?? "chzzk" } : {}),
   }));
 }
 

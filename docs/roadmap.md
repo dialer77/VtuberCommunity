@@ -23,7 +23,7 @@
 | `docs/deploy-windows-tunnel.md` | 배포 PC·터널·Vercel 연결, 운영 스크립트 |
 | `docs/issue-collector.md` | 이슈 자동 수집 (Claude 구독 + Claude Code 헤드리스) |
 | `docs/user-accounts.md` | 로그인·최애·웹 푸시 설정, 외부 DB 이전 |
-| `docs/youtube-api.md` | YouTube API 키, 할당량, 지켜야 할 정책 |
+| `docs/youtube-api.md` | YouTube API 키, 공식 채널 연동 운영(`youtube.ps1`), 할당량, 지켜야 할 정책 |
 | `docs/search-console.md` | Google Search Console |
 
 ## 2. 지금 상태
@@ -37,11 +37,13 @@
 - 커뮤니티 기반: 구글 로그인, 최애, 방송 시작 웹 푸시, 내 페이지(`/me`), 탈퇴, 이용약관·개인정보처리방침
 - 소속사 필터: 소속사 명단(roster) 기반 판정 (`server/src/tags/roster.ts`, `roster-seed.json`)
 - V코인(`/coins`): 비공식 베타로 메뉴에서 숨김
+- 유튜브 공식 채널 연동 (2단계): 채널 매핑(치지직 `socialLinks`·SOOP `link` 의 유튜브 링크로 자동 추정 + 운영자 확정 `deploy\windows\youtube.ps1`), 프로필 "공식 영상" 탭(RSS + `videos.list`, 사이트 안 재생), 유튜브 라이브 감지(LIVE 목록·프로필에만, 홈 합계·랭킹·데뷔 감지 제외), 30일 갱신·정리. 코드 `server/src/youtube/`, 운영 `docs/youtube-api.md` 3장
 
 ### 코드는 배포됐고, 사용자가 설정해야 켜지는 것
 배포 PC 작업은 RDP 로 사용자가 직접 실행합니다.
 
-- [x] **YouTube API 키 등록** (2026-11-10 완료): 배포 PC `server\.env` 의 `YOUTUBE_API_KEY`. 교체할 때는 바탕화면 `youtube-key.txt` → `deploy\windows\setup-youtube.ps1` (`docs/youtube-api.md`). 수집기가 아직 골격뿐이라 할당량은 쓰지 않는 중
+- [x] **YouTube API 키 등록** (2026-11-10 완료): 배포 PC `server\.env` 의 `YOUTUBE_API_KEY`. 교체할 때는 바탕화면 `youtube-key.txt` → `deploy\windows\setup-youtube.ps1` (`docs/youtube-api.md`). 키가 있으므로 공식 채널 연동이 자동으로 켜져 있음 (하루 보통 2,000단위 아래, 예산 8,000)
+- [ ] **유튜브 매핑 정리**: 배포 후 1~2시간이면 상위 200명 1회차가 끝남. `deploy\windows\youtube.ps1 pending` 으로 후보가 여럿·다시보기만·공용 채널인 버튜버를 `set`/`none` 으로 정리, `list nolink` 중 공식 채널이 있는 버튜버는 `set` (개발 PC 시험 기준 190명 중 확인필요 13명, 링크없음 41명)
 - [ ] **사용자 DB**: `deploy\windows\setup-userdb.ps1` (`docs/user-accounts.md` 1단계)
 - [ ] **구글 로그인**: Google OAuth 클라이언트 발급 → Vercel 환경변수 5개 → 재배포 (`docs/user-accounts.md` 2·3단계)
 - [ ] **이슈 수집 토큰 교체**: 사용자가 Claude 계정을 바꿀 예정이라 새 계정으로 다시 발급 — `deploy\windows\setup-issues.ps1 -RenewToken`
@@ -50,10 +52,19 @@
 - 실제 구글 계정 로그인 (위조 세션 쿠키로만 시험함)
 - 아이폰(홈 화면에 추가) 웹 푸시 (PC Chrome 에서는 실제 FCM 발송·표시까지 확인함)
 - 로그인된 Chrome 에서 사이트 안 유튜브 재생 시 Premium 광고 제거 여부
+- 유튜브 연동을 실제 API 키로 돌린 결과 — 개발 PC 에서는 실제 치지직·SOOP 링크·RSS + 가짜 YouTube API 로 시험 (매핑·영상 상세·라이브 카드·공식 영상 탭 화면). 실제 키의 라이브 감지·할당량은 배포 PC `youtube.ps1 status` 로 확인
 
 ## 3. 다음 작업 (순서대로)
 
-### 2단계 — 유튜브 공식 채널 연동 ← 다음 작업 (키 등록 완료, 바로 시작 가능)
+### 2단계 — 유튜브 공식 채널 연동 ✅ 완료 (2026-11-10)
+
+남은 것 (필요해지면):
+- 유튜브 방송 시작 웹 푸시 (지금 알림은 치지직·SOOP 만) — 매핑된 버튜버를 최애로 둔 사용자에게
+- 후보가 여럿일 때 자동 판정 보강 — 영상 설명에 적힌 치지직·SOOP 주소로 역확인
+- 쇼츠 구분 (RSS 로는 구분 안 됨), 유튜브만 하는 버튜버(치지직·SOOP 채널이 없는 경우)
+- 유튜브 라이브를 처음 하는 채널은 RSS 60분 주기라 늦게 잡힐 수 있음 (한 번 잡히면 30일간 10분 주기)
+
+처음 계획 (기록용):
 - **채널 매핑**: 버튜버 ↔ 유튜브 공식 채널. 자동 추정 + 운영자 수동 확정·덮어쓰기. 상위 채널부터.
   - 후보 출처: 치지직·SOOP 채널 소개의 링크, 데뷔 수집 결과, `channels.list`(`forHandle`, 1단위)
 - **프로필 "공식 영상" 탭**: 최신 영상은 채널 RSS(`youtube.com/feeds/videos.xml?channel_id=…`, 할당량 0), 상세는 `videos.list` 50개 묶음(1단위). 재생은 기존 사이트 안 플레이어(`web/src/components/player/`).
@@ -62,7 +73,7 @@
   - API 로 받은 데이터는 30일 안에 갱신하거나 삭제 → 저장 시 `fetched_at` 을 두고 주기적으로 갱신
   - 여러 채널의 유튜브 수치를 합산하지 않음 → 랭킹과 홈의 시청자 합계에는 유튜브를 넣지 않고 LIVE 목록에만 표시
 
-### 3단계 — 키리누키 수집·분류
+### 3단계 — 키리누키 수집·분류 ← 다음 작업
 - 목표: "A 클립이 재밌다 → 같은 버튜버의 비슷한 클립 / 다른 버튜버의 비슷한 클립"을 찾아 주기
 - 키리누키 채널 발견: `search.list`(하루 100회 별도 한도)로 버튜버 이름 검색 → 채널을 등록해 두고 이후 새 영상은 RSS 로 추적
 - 분류: 누가 / 무엇을 / 어떤 순간 / 한 줄 요약 태그. Claude 헤드리스(구독)로 생성
@@ -129,4 +140,3 @@
 
 - `web/src/components/theme-toggle.tsx` 에 예전부터 있던 lint 오류 (기능과 무관)
 - `docs/deploy-fly.md`, `docs/deploy-railway.md`, `docs/backend-architecture.md` 는 예전 계획. 현재 배포는 Windows PC + Cloudflare Tunnel
-- `server/src/collectors/youtube.ts` 는 골격만 있음 — 키를 넣어도 아직 아무것도 수집하지 않음

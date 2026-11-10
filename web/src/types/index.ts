@@ -53,6 +53,10 @@ export interface LiveStream {
   thumbnailUrl: string | null;
   channelUrl: string;
   tags: VmoaTag[];
+  /** 유튜브 방송이면 영상 ID (사이트 안 플레이어로 재생) */
+  videoId?: string;
+  /** 유튜브 방송일 때 버튜버 주 채널의 플랫폼 — 프로필·최애는 /vtuber/{profilePlatform}/{vtuberId} */
+  profilePlatform?: Platform;
 }
 
 /** 신규 데뷔 이벤트 (DETECT 단계에서 생성) */
@@ -186,6 +190,32 @@ export interface CuratedProfile {
   links?: { label: string; url: string }[];
 }
 
+/** 유튜브 공식 채널 영상 (RSS + videos.list 상세) */
+export interface YoutubeVideo {
+  videoId: string;
+  title: string;
+  publishedAt: string;
+  thumbnailUrl: string;
+  /** null = 아직 모름 */
+  liveStatus: "none" | "upcoming" | "live" | "ended" | null;
+  scheduledAt: string | null;
+  liveStartedAt: string | null;
+  durationSec: number | null;
+}
+
+/** 버튜버의 유튜브 공식 채널 (버모아가 연결) */
+export interface YoutubeChannel {
+  ytChannelId: string;
+  title: string | null;
+  handle: string | null;
+  url: string;
+  thumbnailUrl: string | null;
+  /** auto = 자동 추정(틀릴 수 있음), manual = 운영자 확인 */
+  status: "auto" | "manual";
+  videos: YoutubeVideo[];
+  live: (YoutubeVideo & { viewers: number | null }) | null;
+}
+
 /** 스트리머 프로필 (자동 데이터 + 태그 + 큐레이션) */
 export interface ChannelProfile {
   channelId: string;
@@ -202,6 +232,8 @@ export interface ChannelProfile {
   tags: VmoaTag[];
   curated: CuratedProfile;
   broadcasts: Broadcast[];
+  /** 유튜브 공식 채널 (연결 전·이전 백엔드면 없음) */
+  youtube?: YoutubeChannel | null;
 }
 
 /** 이슈 타임라인 아이템 (수동 큐레이션 콘텐츠) */

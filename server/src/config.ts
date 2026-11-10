@@ -30,6 +30,18 @@ export const config = {
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
   vapidSubject: process.env.VAPID_SUBJECT ?? "https://vmoa.live",
 
+  // ---- YouTube 공식 채널 연동 — docs/youtube-api.md
+  /** Data API 키. 서버(.env)에만 둔다 */
+  youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "",
+  /** API 주소 (시험용으로 바꿀 때만) */
+  youtubeApiBase: process.env.YOUTUBE_API_BASE ?? "https://www.googleapis.com/youtube/v3",
+  /** 연동 켜기. 기본은 키가 있을 때만. 1 = 키 없이 매핑·RSS 만(@핸들 변환·라이브 감지 없음), 0 = 끔 */
+  youtubeSync: process.env.YOUTUBE_SYNC ? process.env.YOUTUBE_SYNC === "1" : !!process.env.YOUTUBE_API_KEY,
+  /** 하루 할당량 예산(단위). 기본 한도 10,000 중 이만큼만 쓴다. 80% 를 넘으면 방송 중 확인만 */
+  youtubeDailyBudget: Number(process.env.YOUTUBE_DAILY_BUDGET ?? 8000),
+  /** 매핑 대상: 월간 시청시간 상위 N + 지금 방송 중 + 확정 목록 */
+  youtubeMapTop: Number(process.env.YOUTUBE_MAP_TOP ?? 200),
+
   // ---- 이슈 자동 수집 (Claude Code 헤드리스 + 구독 인증) — docs/issue-collector.md
   /** 1 이면 주기적으로 이슈 수집 */
   issuesEnabled: process.env.ISSUES_ENABLED === "1",

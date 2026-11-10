@@ -6,10 +6,12 @@ import { Avatar } from "@/components/avatar";
 import { PlatformBadge } from "@/components/platform-badge";
 import { formatCount, formatDate, formatDateTime } from "@/lib/format";
 import { FavoriteButton } from "@/components/auth/favorite-button";
+import { YoutubeLiveBox, YoutubeVideos } from "@/components/youtube-videos";
 
 export const dynamic = "force-dynamic";
 
 type Params = Promise<{ platform: string; channelId: string }>;
+type Search = Promise<{ tab?: string }>;
 
 export async function generateMetadata({
   params,
@@ -27,12 +29,17 @@ export async function generateMetadata({
 
 export default async function VtuberProfilePage({
   params,
+  searchParams,
 }: {
   params: Params;
+  searchParams: Search;
 }) {
-  const { platform, channelId } = await params;
+  const [{ platform, channelId }, { tab }] = await Promise.all([params, searchParams]);
   const p = await getChannelProfile(platform, channelId);
   if (!p) notFound();
+  const yt = p.youtube ?? null;
+  const showVideos = !!yt && tab === "videos";
+  const base = `/vtuber/${p.platform}/${p.channelId}`;
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
@@ -109,6 +116,7 @@ export default async function VtuberProfilePage({
             채널 방문 →
           </a>
         )}
+        {yt ? <YoutubeLiveBox yt={yt} /> : null}
       </header>
 
       {/* 큐레이션 정보 */}
@@ -148,9 +156,21 @@ export default async function VtuberProfilePage({
         <StatBox label="감지일" value={formatDate(p.firstSeenAt)} />
       </section>
 
-      {/* 이전 방송 기록 */}
+      {/* 탭: 이전 방송 기록 · 공식 영상(유튜브 채널이 연결됐을 때) */}
+      {yt ? (
+        <nav className="flex gap-2" aria-label="프로필 탭">
+          <TabLink href={base} active={!showVideos} label="이전 방송 기록" />
+          <TabLink href={`${base}?tab=videos`} active={showVideos} label={`공식 영상${yt.videos.length ? ` ${yt.videos.length}` : ""}`} />
+        </nav>
+      ) : null}
+
+      {showVideos && yt ? (
+        <section className="flex flex-col gap-3" aria-label="공식 영상">
+          <YoutubeVideos yt={yt} />
+        </section>
+      ) : (
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>
+        {yt ? null : <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>}
         {p.broadcasts.length === 0 ? (
           <p className="text-sm text-muted-2">아직 기록된 방송이 없어요.</p>
         ) : (
@@ -181,7 +201,25 @@ export default async function VtuberProfilePage({
           있어요.
         </p>
       </section>
+      )}
     </div>
+  );
+}
+
+function TabLink({ href, active, label }: { href: string; active: boolean; label: string }) {
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      aria-current={active ? "page" : undefined}
+      className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
+        active
+          ? "border-accent bg-accent text-accent-fg font-semibold"
+          : "border-border bg-surface text-muted hover:border-accent/50 hover:text-foreground"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }
 

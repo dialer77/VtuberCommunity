@@ -70,7 +70,7 @@ async function soopLive(e: RegistryEntry): Promise<RawLive | null> {
 
 /**
  * 이번 사이클 목록에 없던(seen 에 없는) 확정 채널만 직접 조회해 방송 중인 것을 돌려준다.
- * 유튜브는 아직 대상 아님 (2단계에서 YouTube API 로).
+ * 유튜브는 대상 아님 — 공식 채널 라이브는 src/youtube/sync.ts 가 따로 확인.
  */
 export async function fetchRegistryLives(
   entries: RegistryEntry[],

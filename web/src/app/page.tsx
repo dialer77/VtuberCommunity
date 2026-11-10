@@ -17,7 +17,9 @@ export default async function HomePage({
 }) {
   const { tag } = await searchParams;
   const [lives, tags] = await Promise.all([getLiveStreams(tag), getTags()]);
-  const totalViewers = lives.reduce((s, l) => s + l.viewers, 0);
+  // 유튜브 시청자 수는 합산하지 않는다 (YouTube API 정책 — 여러 채널의 수치를 합치지 않음)
+  const totalViewers = lives.reduce((s, l) => s + (l.platform === "youtube" ? 0 : l.viewers), 0);
+  const hasYoutube = lives.some((l) => l.platform === "youtube");
   const platforms = new Set(lives.map((l) => l.platform)).size;
   const activeTag = tag ? tags.find((t) => t.id === tag) : undefined;
 
@@ -38,6 +40,9 @@ export default async function HomePage({
           <Stat label="시청자" value={formatCount(totalViewers)} unit="명" />
           <Stat label="플랫폼" value={formatCount(platforms)} unit="개" />
         </div>
+        {hasYoutube ? (
+          <p className="text-xs text-muted-2 -mt-2">시청자 합계에 유튜브 방송은 넣지 않아요.</p>
+        ) : null}
       </section>
 
       <FavoriteLiveRow />

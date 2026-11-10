@@ -4,15 +4,19 @@ import { PLATFORMS } from "@/types";
 import { PlatformBadge } from "@/components/platform-badge";
 import { formatCount, elapsedSince } from "@/lib/format";
 import { FavoriteButton } from "@/components/auth/favorite-button";
+import { PlayVideo } from "@/components/player/play-video";
 
 export function LiveCard({ stream }: { stream: LiveStream }) {
   const color = PLATFORMS[stream.platform].color;
   const initial = stream.vtuberName.trim().charAt(0);
+  // 유튜브 방송은 버튜버 주 채널(치지직·SOOP) 프로필로 연결하고, 썸네일을 누르면 사이트 안에서 재생
+  const profilePlatform = stream.profilePlatform ?? stream.platform;
+  const showViewers = !(stream.videoId && stream.viewers <= 0); // 유튜브는 시청자 수를 숨긴 방송이 있음
 
   return (
     <div className="relative">
     <Link
-      href={`/vtuber/${stream.platform}/${stream.vtuberId}`}
+      href={`/vtuber/${profilePlatform}/${stream.vtuberId}`}
       className="group flex flex-col rounded-xl border border-border bg-surface overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-xl hover:shadow-black/[0.06]"
     >
       {/* 썸네일 영역 (실데이터 연결 전 플랫폼 컬러 기반 자리표시) */}
@@ -48,7 +52,7 @@ export function LiveCard({ stream }: { stream: LiveStream }) {
             style={{ background: color }}
             aria-hidden
           />
-          {formatCount(stream.viewers)}
+          {showViewers ? formatCount(stream.viewers) : PLATFORMS[stream.platform].label}
         </span>
       </div>
 
@@ -87,10 +91,20 @@ export function LiveCard({ stream }: { stream: LiveStream }) {
         ) : null}
       </div>
     </Link>
+    {stream.videoId ? (
+      <PlayVideo
+        video={{ id: stream.videoId, title: stream.title, channel: stream.vtuberName }}
+        className="group/play absolute inset-x-0 top-0 aspect-video rounded-t-xl flex items-center justify-center"
+      >
+        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/55 text-xl text-white opacity-80 shadow-lg transition group-hover/play:scale-110 group-hover/play:opacity-100">
+          ▶
+        </span>
+      </PlayVideo>
+    ) : null}
     <div className="absolute top-2 right-2">
       <FavoriteButton
         compact
-        target={{ platform: stream.platform, channelId: stream.vtuberId, channelName: stream.vtuberName }}
+        target={{ platform: profilePlatform, channelId: stream.vtuberId, channelName: stream.vtuberName }}
       />
     </div>
     </div>

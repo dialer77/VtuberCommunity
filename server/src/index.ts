@@ -10,6 +10,7 @@ import { startAiJobs } from "./issues/scheduler";
 import { migrateUserDb, userDbEnabled } from "./userdb/db";
 import { buildAgencyRoster, loadRosterSeed } from "./tags/roster";
 import { setAgencyRoster } from "./tags/catalog";
+import { startYoutubeSync } from "./youtube/sync";
 
 function makeStore(): Store {
   switch (config.storeKind) {
@@ -66,6 +67,8 @@ if (store instanceof SqliteStore) {
   );
   // Claude 자동 수집 — 이슈 3시간 · 신규 데뷔 6시간 (ISSUES_ENABLED=1 일 때만)
   startAiJobs(store);
+  // 유튜브 공식 채널 연동 — 매핑·RSS·라이브 (YOUTUBE_API_KEY 가 있을 때만)
+  startYoutubeSync(store);
 }
 
 // 수집 스케줄러

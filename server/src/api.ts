@@ -11,6 +11,7 @@ import {
   type TagDef,
 } from "./tags/catalog";
 import { curatedProfile } from "./profiles";
+import { youtubeForProfile, youtubeLiveItems } from "./youtube/view";
 import { config } from "./config";
 import { VERSION, STARTED_AT } from "./version";
 import { userDbEnabled } from "./userdb/db";
@@ -68,6 +69,13 @@ function toTagRefs(ids: string[]): TagRef[] {
   return refs;
 }
 
+/** 지금 방송 중 전체 = 치지직·SOOP(수집 스냅샷) + 유튜브(LIVE 목록 전용, 랭킹·합계에는 넣지 않음) */
+function currentLivesAll(store: SqliteStore): LiveItem[] {
+  const yt = youtubeLiveItems(store);
+  if (yt.length === 0) return store.getCurrentLives();
+  return [...store.getCurrentLives(), ...yt].sort((a, b) => b.viewers - a.viewers);
+}
+
 function enrich(item: LiveItem): LiveWithTags {
   const ids = resolveChannelTags(item.channelId, item.rawTags);
   const { rawTags: _raw, ...rest } = item;
@@ -95,7 +103,7 @@ export function buildApi(store: SqliteStore) {
   // 현재 방송중 (+ VMOA 태그). ?tag=<id> 로 필터.
   app.get("/api/lives", async (req) => {
     const q = req.query as { tag?: string };
-    let lives = store.getCurrentLives().map(enrich);
+    let lives = currentLivesAll(store).map(enrich);
     if (q.tag) {
       lives = lives.filter((l) => l.tags.some((t) => t.id === q.tag));
     }
@@ -104,7 +112,7 @@ export function buildApi(store: SqliteStore) {
 
   // 태그 카탈로그 + 현재 방송중 채널 기준 태그별 개수
   app.get("/api/tags", async () => {
-    const lives = store.getCurrentLives();
+    const lives = currentLivesAll(store);
     const counts = new Map<string, number>();
     for (const l of lives) {
       for (const id of resolveChannelTags(l.channelId, l.rawTags)) {
@@ -134,6 +142,7 @@ export function buildApi(store: SqliteStore) {
       ...rest,
       tags: toTagRefs(resolveChannelTags(profile.channelId, rawTags)),
       curated: curatedProfile(profile.channelId),
+      youtube: youtubeForProfile(store, profile.platform, profile.channelId),
     };
   });
 
@@ -246,7 +255,9 @@ export function buildApi(store: SqliteStore) {
   app.get("/api/user/:userId/favorites", async (req, reply) => {
     if (!checkInternal(req, reply)) return reply;
     const favorites = await listFavorites((req.params as { userId: string }).userId);
-    const lives = new Map(store.getCurrentLives().map((l) => [l.channelId, l]));
+    // 치지직·SOOP 방송을 우선, 그 채널이 유튜브에서만 방송 중이면 유튜브 방송
+    const lives = new Map<string, LiveItem>();
+    for (const l of [...youtubeLiveItems(store), ...store.getCurrentLives()]) lives.set(l.channelId, l);
     return {
       favorites: favorites.map((f) => {
         const live = lives.get(f.channelId);

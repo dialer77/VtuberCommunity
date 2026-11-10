@@ -38,6 +38,50 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\setup-youtube.ps1
 - 키 교체: 새 키로 같은 방법을 반복
 - 연동 끄기: `-Disable`
 
+## 3. 공식 채널 연동 (2단계)
+
+키를 등록하면 서버가 재시작되면서 자동으로 켜집니다. 따로 할 일은 아래 **확인이 필요한 채널**을 가끔 정리하는 것뿐입니다.
+
+### 하는 일
+
+| 작업 | 주기 | 할당량 |
+| --- | --- | --- |
+| **채널 매핑** — 치지직 채널 정보의 `socialLinks`, SOOP 방송국의 `link` 에 걸린 유튜브 링크로 공식 채널 추정. 월간 시청시간 상위 200명 → 지금 방송 중 → 확정 목록 순 | 10분마다 30명. 자동 연결은 7일, 링크 없음은 3일마다 다시 확인 | `@핸들` 변환 1단위 (`channels.list forHandle`) |
+| **최신 영상** — 채널 RSS 15개 (제목·게시 시각) | 최근 30일 안에 유튜브 라이브가 있던 채널 10분, 나머지 60분 | 0 |
+| **영상 상세** — 라이브 여부·예정 시각·길이 | 새 영상 발견 시, 방송 중·15분 안에 시작할 예정 영상은 매분 | 50개당 1단위 (`videos.list`) |
+| **30일 정리** — API 로 받은 값은 20일이 지나면 다시 받고, 30일이 넘은 값은 지움 | 30분·6시간마다 | 50개당 1단위 |
+
+하루 사용량은 보통 2,000단위 아래입니다 (방송 중 확인이 하루 최대 1,440). `YOUTUBE_DAILY_BUDGET`(기본 8,000)의 80% 를 넘으면 방송 중 확인만 계속하고, YouTube 가 할당량 초과를 알려 오면 태평양 자정까지 멈춥니다.
+
+화면에서는 프로필의 **공식 영상** 탭(사이트 안 플레이어로 재생)과, 유튜브에서 방송 중이면 LIVE 목록·프로필 머리에 나옵니다. 유튜브 시청자 수는 LIVE 카드에만 보이고 **홈의 시청자 합계·랭킹·데뷔 감지에는 들어가지 않습니다** (수집 스냅샷과 따로 저장).
+
+### 매핑 확인·수정 (배포 PC)
+
+자동 추정은 링크 이름으로 고릅니다. 다시보기·클립·ASMR·노래 채널, 다른 이름(소속사·다른 멤버)이 붙은 링크는 감점하고, 동점이거나 보조 채널만 있으면 **확인필요**로 남겨 운영자에게 넘깁니다.
+
+```powershell
+cd D:\01_Project\21_VtuberCommunity
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 status            # 상태별 개수 · 오늘 할당량 · 방송 중
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 pending           # 확인이 필요한 채널과 후보
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 list auto 50      # 자동 연결 결과 (상위부터)
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 show "구슬요"
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 set "구슬요" https://www.youtube.com/@beadyo97
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 none "모라라"      # 공식 채널 없음 (자동 연결 안 함)
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 auto "모라라"      # 확정 해제 → 다시 자동 추정
+```
+
+- 대상은 버튜버 이름 또는 `chzzk:<채널ID>` · `soop:<아이디>`. 같은 이름이 여럿이면 후보를 보여 줍니다.
+- 주소는 `youtube.com/channel/UC…`, `youtube.com/@핸들`, `UC…` 모두 됩니다. `/c/`·`/user/` 예전 주소는 채널 페이지의 `channel/UC…` 주소로 적습니다.
+- `set`·`none` 으로 정한 것은 자동 확인이 덮어쓰지 않습니다. 바로 사이트에 반영됩니다.
+
+| 상태 | 뜻 |
+| --- | --- |
+| 자동 (`auto`) | 링크로 자동 연결. 프로필에 "자동 추정이라 틀릴 수 있어요" 표시 |
+| 확정 (`manual`) | 운영자가 지정 |
+| 없음 (`none`) | 운영자가 "공식 채널 없음/연결 안 함"으로 지정 |
+| 확인필요 (`pending`) | 후보가 여럿, 보조 채널만 있음, 예전 주소, `@핸들` 변환 실패, 다른 버튜버와 같은 채널(소속사·그룹 공용 채널일 수 있음 — 맞는 한 명만 `set`) |
+| 링크없음 (`nolink`) | 채널 정보에 유튜브 링크가 없음 — 공식 채널이 있으면 `set` 으로 지정 |
+
 ## 할당량
 
 | 항목 | 하루 기본 한도 |
