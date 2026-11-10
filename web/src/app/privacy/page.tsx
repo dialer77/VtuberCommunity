@@ -76,13 +76,23 @@ export default function PrivacyPage() {
           해당 정보의 권리는 각 플랫폼과 크리에이터에게 있습니다.
         </p>
 
-        <h2>4. 정보의 수정·삭제</h2>
+        <h2>4. YouTube API 서비스</h2>
+        <p>
+          서비스는 유튜브 영상 재생과 공개 채널·영상 정보 조회에 YouTube API 서비스를 사용합니다. 서비스 안에서
+          유튜브 영상을 재생하면 YouTube(Google)가 쿠키 등으로 정보를 수집할 수 있으며, 이는{" "}
+          <a href="https://www.google.com/policies/privacy" target="_blank" rel="noopener noreferrer">
+            Google 개인정보처리방침
+          </a>
+          을 따릅니다. 유튜브 영상은 재생 버튼을 누르기 전까지 불러오지 않습니다.
+        </p>
+
+        <h2>5. 정보의 수정·삭제</h2>
         <p>
           표시된 채널·방송 정보의 수정·삭제를 원하시면{" "}
           <a href="/contact">문의</a>를 통해 요청하실 수 있습니다.
         </p>
 
-        <h2>5. 방침 변경</h2>
+        <h2>6. 방침 변경</h2>
         <p>
           본 방침은 법령·서비스 변경에 따라 개정될 수 있으며, 변경 시 본
           페이지를 통해 공지합니다.

@@ -43,7 +43,17 @@ export default function TermsPage() {
           판단되면 <a href="/contact">문의</a>로 해당 주소와 사유를 알려주세요. 확인 후 지체 없이 숨김 등의 조치를 합니다.
         </p>
 
-        <h2>6. 변경</h2>
+        <h2>6. YouTube</h2>
+        <p>
+          서비스는 YouTube API 서비스를 사용합니다. 서비스에서 유튜브 영상을 보거나 유튜브 정보를 이용하면{" "}
+          <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer">
+            YouTube 서비스 약관
+          </a>
+          에 동의하는 것으로 봅니다. 영상과 채널 정보의 출처는 YouTube 이며, 버모아의 분류·태그·투표 결과는 YouTube 가
+          아닌 버모아 자체 정보입니다.
+        </p>
+
+        <h2>7. 변경</h2>
         <p>서비스와 본 약관은 변경될 수 있으며, 약관이 바뀌면 이 페이지에 공지합니다.</p>
       </div>
     </div>
