@@ -343,3 +343,30 @@ export interface ProfileClips {
   /** 자주 하는 것 (게임 이름 등) */
   topics: { topic: string; count: number }[];
 }
+
+/** 버튜버 검색 결과 하나 (방송 중이 아니어도 수집 DB 에 있으면 나온다) */
+export interface SearchResult {
+  platform: Platform;
+  channelId: string;
+  name: string;
+  /** 이름이 아닌 다른 이름(예전 이름·유튜브 채널명 등)으로 찾았을 때 그 이름 */
+  matchedName: string | null;
+  tags: VmoaTag[];
+  isLive: boolean;
+  livePlatform: Platform | null;
+  viewers: number | null;
+  liveTitle: string | null;
+  /** 마지막 방송 날짜 YYYY-MM-DD (KST) */
+  lastLiveDate: string | null;
+  firstSeenAt: string;
+}
+
+export interface SearchResponse {
+  q: string;
+  tags: VmoaTag[];
+  unknownTags: string[];
+  suggestedTags: VmoaTag[];
+  total: number;
+  results: SearchResult[];
+  tagCounts: TagCount[];
+}

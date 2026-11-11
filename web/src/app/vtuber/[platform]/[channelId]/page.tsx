@@ -77,12 +77,14 @@ export default async function VtuberProfilePage({
             {p.tags.length > 0 ? (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {p.tags.map((t) => (
-                  <span
+                  <Link
                     key={t.id}
-                    className="text-[11px] rounded-full bg-accent/10 text-accent px-1.5 py-0.5"
+                    href={`/search?tag=${t.id}`}
+                    title={`${t.label} 버튜버 모두 보기`}
+                    className="text-[11px] rounded-full bg-accent/10 text-accent px-1.5 py-0.5 hover:bg-accent/20 transition-colors"
                   >
                     {t.emoji} {t.label}
-                  </span>
+                  </Link>
                 ))}
               </div>
             ) : null}

@@ -40,6 +40,7 @@
 - 유튜브 공식 채널 연동 (2단계): 채널 매핑(치지직 `socialLinks`·SOOP `link` 의 유튜브 링크로 자동 추정 + 운영자 확정 `deploy\windows\youtube.ps1`), 프로필 "공식 영상" 탭(RSS + `videos.list`, 사이트 안 재생), 유튜브 라이브 감지(LIVE 목록·프로필에만, 홈 합계·랭킹·데뷔 감지 제외), 30일 갱신·정리. 코드 `server/src/youtube/`, 운영 `docs/youtube-api.md` 3장
 - 키리누키 참여 (4단계, 로그인 기반 — 사용자 DB·구글 로그인 설정 후 켜짐): 클립 좋아요(`/clips?sort=likes` 좋아요순), 내 재생목록(만들기·담기·이름 바꾸기·전체 재생 — 공식 임베드 `playlist` 매개변수), '어떤 순간' 태그 투표(찬반 2표 차이로 분류에 반영), 내 페이지 "내 재생목록"·"좋아요한 클립". 사용자 DB `userdb/clips.ts`, 합계는 수집 DB 에 복사
 - 키리누키 수집·분류 (3단계): 키리누키 채널 발견(`search.list` 하루 20회, 채널 ID 만) → RSS 추적 → Claude 헤드리스 분류(누가·무엇을·어떤 순간·한 줄 요약, RSS 제목·설명만 입력) → 비슷한 클립(같은 버튜버·다른 버튜버). `/clips` 모음·태그별, `/clips/<ID>` 상세, 프로필 "키리누키" 탭(특징 태그). 코드 `server/src/clips/`, 운영 `deploy\windows\clips.ps1`, `docs/youtube-api.md` 4장
+- 버튜버 검색 (`/search`, 2026-11-11): 방송 중이 아니어도 수집 DB 의 채널 전체를 이름·예전 이름(일별 집계)·확정 목록 이름·유튜브 채널명·초성(`ㅅㅌ`)·`#태그` 로 검색. 태그 칩(소속사·컨셉·콘텐츠, 여러 개 = 모두 만족), 태그 이름을 그대로 쓰면 그 태그 버튜버도 함께, 검색어 없으면 최근 30일 많이 본 순. 헤더 검색창(좁은 화면은 아이콘), 프로필의 태그를 누르면 같은 태그 버튜버 목록. 코드 `server/src/search.ts`(메모리 색인 10분 갱신), `web/src/components/search/`
 
 ### 코드는 배포됐고, 사용자가 설정해야 켜지는 것
 배포 PC 작업은 RDP 로 사용자가 직접 실행합니다.
@@ -150,8 +151,10 @@
 - 화면·푸시: 헤드리스 Chrome(CDP)에 쿠키를 넣고 스크린샷. 실제 FCM 구독 → 발송 → 알림 표시까지 확인 가능
 - 저장소 밖 시험 스크립트에서 top-level await 를 쓰면 `.mts` 로 만든다 (tsx)
 - 배포 확인: `https://api.vmoa.live/health` 의 `version`, 웹은 `vercel ls`
+- 입력마다 결과가 바뀌는 화면: `router.replace` 로 서버 컴포넌트를 다시 그리면 글자 입력 직후의 첫 이동이 다음 입력 때까지 반영되지 않는 문제가 있었음 (Next 16.2). 결과만 같은 출처 API 로 받아 바꾸고 주소는 `history.replaceState`/`pushState` 로 맞춘다 (`components/search/search-view.tsx`). 실제 입력 확인은 Orca 내장 브라우저 `type` 으로
 
 ## 7. 알려진 문제·정리 대상
 
+- 검색은 버모아가 방송을 한 번이라도 본 채널만 나온다 (프로필 페이지가 있는 채널). 확정 목록(`vtuber_registry`)에만 있고 방송을 아직 못 본 채널은 나오지 않음
 - `web/src/components/theme-toggle.tsx` 에 예전부터 있던 lint 오류 (기능과 무관)
 - `docs/deploy-fly.md`, `docs/deploy-railway.md`, `docs/backend-architecture.md` 는 예전 계획. 현재 배포는 Windows PC + Cloudflare Tunnel

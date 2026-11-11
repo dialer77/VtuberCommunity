@@ -20,6 +20,7 @@ import type {
   Clip,
   ClipDetail,
   ClipTagCount,
+  SearchResponse,
 } from "@/types";
 import {
   fetchLivesFromBackend,
@@ -36,6 +37,7 @@ import {
   fetchClips,
   fetchClipTags,
   fetchClip,
+  fetchSearch,
 } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
@@ -242,6 +244,16 @@ export async function getClipTags(): Promise<ClipTagCount[]> {
 export async function getClip(videoId: string): Promise<ClipDetail | null> {
   try {
     return await fetchClip(videoId);
+  } catch {
+    return null;
+  }
+}
+
+// ---- 버튜버 검색 (백엔드가 멈추면 null → 화면에서 안내)
+
+export async function searchVtubers(q: Parameters<typeof fetchSearch>[0]): Promise<SearchResponse | null> {
+  try {
+    return await fetchSearch(q);
   } catch {
     return null;
   }

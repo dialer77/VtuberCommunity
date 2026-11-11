@@ -11,6 +11,7 @@ import {
   type TagDef,
 } from "./tags/catalog";
 import { curatedProfile } from "./profiles";
+import { searchChannels } from "./search";
 import { youtubeForProfile, youtubeLiveItems } from "./youtube/view";
 import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
 import { MOMENT_IDS } from "./clips/vocab";
@@ -147,6 +148,23 @@ export function buildApi(store: SqliteStore) {
       count: counts.get(t.id) ?? 0,
     }));
     return { tags };
+  });
+
+  // 버튜버 검색 — 수집 DB 의 채널 전체(방송 중이 아니어도).
+  // ?q=이름·초성·'#태그' &tag=<태그id>,<태그id>(모두 만족) &limit=30&offset=0. 검색어 없이 태그만 주면 그 태그 채널 목록
+  app.get("/api/search", async (req) => {
+    const q = req.query as { q?: string; tag?: string | string[]; limit?: string; offset?: string };
+    const tags = (Array.isArray(q.tag) ? q.tag : [q.tag ?? ""])
+      .flatMap((t) => t.split(","))
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .slice(0, 10);
+    return searchChannels(store, currentLivesAll(store), {
+      q: typeof q.q === "string" ? q.q : "",
+      tags,
+      limit: Number(q.limit) || 30,
+      offset: Number(q.offset) || 0,
+    });
   });
 
   // 채널 프로필 (자동 데이터 + VMOA 태그 + 큐레이션 정보)

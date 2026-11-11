@@ -19,6 +19,7 @@ import type {
   Clip,
   ClipDetail,
   ClipTagCount,
+  SearchResponse,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -270,4 +271,21 @@ export async function fetchClip(videoId: string): Promise<ClipDetail | null> {
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`backend /api/clips/:id ${res.status}`);
   return (await res.json()) as ClipDetail;
+}
+
+/** 버튜버 검색 — 이름·초성·'#태그', tags 는 모두 만족 */
+export async function fetchSearch(q: {
+  q?: string;
+  tags?: string[];
+  limit?: number;
+  offset?: number;
+}): Promise<SearchResponse> {
+  const sp = new URLSearchParams();
+  if (q.q) sp.set("q", q.q);
+  if (q.tags?.length) sp.set("tag", q.tags.join(","));
+  sp.set("limit", String(q.limit ?? 30));
+  sp.set("offset", String(q.offset ?? 0));
+  const res = await fetch(`${BASE}/api/search?${sp}`, fetchInit());
+  if (!res.ok) throw new Error(`backend /api/search ${res.status}`);
+  return (await res.json()) as SearchResponse;
 }

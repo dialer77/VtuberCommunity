@@ -1079,6 +1079,78 @@ export class SqliteStore implements Store {
     return out;
   }
 
+  /**
+   * 검색 색인 재료 — 수집 DB 의 채널 전체(방송 중이 아니어도) + 이름 이력·확정 목록 이름·유튜브 채널명
+   * + 마지막 방송 자가 태그 + 일별 집계 기준 활동량. live_snapshots 는 커서 쓰지 않는다 (색인 갱신이 서버를 멈추지 않게).
+   */
+  searchSource(): {
+    channels: { channelId: string; platform: Platform; name: string; firstSeenAt: string }[];
+    aliases: { channelId: string; name: string }[];
+    lastTags: { channelId: string; tags: string[] }[];
+    activity: { channelId: string; lastDate: string | null; viewerMinutes30: number; peak: number }[];
+  } {
+    const channels = (
+      this.db.prepare(`SELECT channel_id, platform, name, first_seen_at FROM channels`).all() as unknown as Array<{
+        channel_id: string;
+        platform: Platform;
+        name: string;
+        first_seen_at: string;
+      }>
+    ).map((r) => ({ channelId: r.channel_id, platform: r.platform, name: r.name, firstSeenAt: r.first_seen_at }));
+
+    const aliasRows = this.db
+      .prepare(`
+        SELECT DISTINCT channel_id, name FROM channel_daily
+        UNION SELECT channel_id, name FROM vtuber_registry
+      `)
+      .all() as unknown as Array<{ channel_id: string; name: string }>;
+    const aliases = aliasRows.map((r) => ({ channelId: r.channel_id, name: r.name }));
+    try {
+      const yt = this.db
+        .prepare(`
+          SELECT l.channel_id, y.title, y.handle FROM yt_links l
+          JOIN yt_channels y ON y.yt_channel_id = l.yt_channel_id
+          WHERE l.status IN ('auto', 'manual')
+        `)
+        .all() as unknown as Array<{ channel_id: string; title: string | null; handle: string | null }>;
+      for (const r of yt) {
+        if (r.title) aliases.push({ channelId: r.channel_id, name: r.title });
+        if (r.handle) aliases.push({ channelId: r.channel_id, name: r.handle });
+      }
+    } catch {
+      // 유튜브 연동 테이블이 없으면 생략
+    }
+
+    const lastTags = (
+      this.db
+        .prepare(`
+          SELECT b.channel_id, b.tags FROM broadcast_tags b
+          JOIN (SELECT channel_id, MAX(started_at) AS m FROM broadcast_tags GROUP BY channel_id) x
+            ON x.channel_id = b.channel_id AND x.m = b.started_at
+        `)
+        .all() as unknown as Array<{ channel_id: string; tags: string }>
+    ).map((r) => ({ channelId: r.channel_id, tags: parseTags(r.tags) }));
+
+    const since = kstDate(Date.now() - 30 * 86_400_000);
+    const activity = (
+      this.db
+        .prepare(`
+          SELECT channel_id, MAX(date) AS last_date,
+            SUM(CASE WHEN date >= ? THEN viewer_minutes ELSE 0 END) AS vm30,
+            MAX(peak_viewers) AS peak
+          FROM channel_daily GROUP BY channel_id
+        `)
+        .all(since) as unknown as Array<{ channel_id: string; last_date: string | null; vm30: number | null; peak: number | null }>
+    ).map((r) => ({
+      channelId: r.channel_id,
+      lastDate: r.last_date,
+      viewerMinutes30: r.vm30 ?? 0,
+      peak: r.peak ?? 0,
+    }));
+
+    return { channels, aliases, lastTags, activity };
+  }
+
   /** 채널의 마지막 방송 자가 태그 (유튜브 방송에 버튜버 태그를 붙일 때) */
   lastRawTags(channelId: string): string[] {
     const r = this.db
