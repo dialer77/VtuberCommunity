@@ -179,6 +179,7 @@ switch (cmd) {
       same_vtuber: "같은 버튜버",
       same_scene: "다른 버튜버",
       co_star: "자주 함께",
+      for_you: "내 취향",
     };
     console.log(`최근 ${days}일 추천 묶음 (노출 = 화면에 보인 횟수, 클릭률 = (열기+재생)/노출)`);
     for (const r of repo.recStats(days)) {

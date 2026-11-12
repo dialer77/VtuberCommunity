@@ -13,6 +13,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Platform } from "../domain";
 import { topicKey } from "./topics";
+import { CLIP_TAGS } from "./vocab";
 
 export type ClipChannelStatus = "auto" | "approved" | "blocked";
 export type ClassStatus = "pending" | "done" | "not_clip" | "failed";
@@ -738,6 +739,72 @@ export class ClipRepo {
     const order = q.sort === "likes" ? `COALESCE(st.likes, 0) DESC, c.published_at DESC` : `c.published_at DESC`;
     const clips = this.selectClips(where, `ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, q.limit, q.offset]);
     return { total, clips };
+  }
+
+  /**
+   * 클립 검색 — 제목·버모아 요약·주제(게임)·사건·출연 버튜버 이름·키리누키 채널명.
+   * 띄어쓴 낱말은 모두 들어 있어야 하고, '#레전드' 처럼 쓰면 분류 태그로 거른다.
+   * 순서: 사건 > 버튜버 이름·주제 > 제목 > 요약·채널 일치 점수 → 좋아요 → 최신 (sort=likes 면 좋아요 먼저)
+   */
+  searchClips(q: ClipQuery & { q: string }): { total: number; clips: ClipRow[] } {
+    const words: string[] = [];
+    const tagIds = new Set<string>(q.tag ? [q.tag] : []);
+    for (const tok of q.q.trim().split(/\s+/).filter(Boolean).slice(0, 8)) {
+      if (tok.startsWith("#")) {
+        const key = topicKey(tok);
+        const t = key ? CLIP_TAGS.find((x) => topicKey(x.label) === key || x.id === key) : undefined;
+        if (t) tagIds.add(t.id);
+        else words.push(tok.slice(1));
+      } else words.push(tok);
+    }
+    const conds = [VISIBLE];
+    const params: unknown[] = [];
+    for (const id of tagIds) {
+      conds.push(`EXISTS (SELECT 1 FROM clip_tags_eff t WHERE t.video_id = c.video_id AND t.tag = ?)`);
+      params.push(id);
+    }
+    if (q.vtuber) {
+      conds.push(`EXISTS (SELECT 1 FROM clip_vtubers v WHERE v.video_id = c.video_id AND v.platform = ? AND v.channel_id = ?)`);
+      params.push(q.vtuber.platform, q.vtuber.channelId);
+    }
+    const like = (w: string) => `%${w.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    for (const w of words.filter(Boolean)) {
+      conds.push(`(c.title LIKE ? ESCAPE '\\' OR c.summary LIKE ? ESCAPE '\\' OR c.topic LIKE ? ESCAPE '\\' OR c.event LIKE ? ESCAPE '\\'
+        OR ch.title LIKE ? ESCAPE '\\'
+        OR EXISTS (SELECT 1 FROM clip_vtubers v JOIN channels n ON n.channel_id = v.channel_id WHERE v.video_id = c.video_id AND n.name LIKE ? ESCAPE '\\'))`);
+      const l = like(w);
+      params.push(l, l, l, l, l, l);
+    }
+    const rows = this.db
+      .prepare(`
+        SELECT c.video_id, c.title, c.summary, c.topic, c.event, ch.title AS ch_title, c.published_at, COALESCE(st.likes, 0) AS likes,
+          (SELECT group_concat(n.name, '|') FROM clip_vtubers v JOIN channels n ON n.channel_id = v.channel_id WHERE v.video_id = c.video_id) AS names
+        FROM clips c JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
+        LEFT JOIN clip_stats st ON st.video_id = c.video_id
+        WHERE ${conds.join(" AND ")}
+        ORDER BY c.published_at DESC LIMIT 3000
+      `)
+      .all(...(params as never[])) as unknown as Array<Record<string, unknown>>;
+    const low = (v: unknown) => (typeof v === "string" ? v.toLowerCase() : "");
+    const scored = rows.map((r) => {
+      let score = 0;
+      for (const w of words.map((x) => x.toLowerCase())) {
+        if (low(r.event).includes(w)) score += 4;
+        if (low(r.names).includes(w)) score += 3;
+        if (low(r.topic).includes(w)) score += 3;
+        if (low(r.title).includes(w)) score += 2;
+        if (low(r.summary).includes(w)) score += 1;
+        if (low(r.ch_title).includes(w)) score += 1;
+      }
+      return { id: r.video_id as string, score, likes: Number(r.likes ?? 0), at: r.published_at as string };
+    });
+    scored.sort((a, b) =>
+      q.sort === "likes"
+        ? b.likes - a.likes || b.score - a.score || b.at.localeCompare(a.at)
+        : b.score - a.score || b.likes - a.likes || b.at.localeCompare(a.at),
+    );
+    const page = scored.slice(q.offset, q.offset + q.limit).map((x) => x.id);
+    return { total: scored.length, clips: this.clipsByIds(page) };
   }
 
   /** 비슷한 클립 후보: 같은 버튜버 / 같은 태그·주제를 가진 최근 클립 */

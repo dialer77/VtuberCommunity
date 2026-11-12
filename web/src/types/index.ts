@@ -312,7 +312,7 @@ export interface Clip {
 
 /** 추천 묶음 — 같은 방송·같은 사건·같은 버튜버·다른 버튜버·자주 함께 */
 export interface RecBundle {
-  id: "same_source" | "same_event" | "same_vtuber" | "same_scene" | "co_star";
+  id: "same_source" | "same_event" | "same_vtuber" | "same_scene" | "co_star" | "for_you";
   title: string;
   /** reason: 카드에 붙는 추천 이유 */
   items: { clip: Clip; reason: string }[];

@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { SessionProvider, signIn, useSession } from "next-auth/react";
+import { AccountSync } from "@/components/auth/account-sync";
 import type { Platform } from "@/types";
 
 /** 서버에 구글 로그인 설정이 있을 때만 켜짐 (next.config.ts) */
@@ -150,6 +151,7 @@ export function AuthProviders({ children }: { children: React.ReactNode }) {
   if (!AUTH_ON) return <>{children}</>;
   return (
     <SessionProvider refetchOnWindowFocus={false}>
+      <AccountSync />
       <FavoritesProvider>{children}</FavoritesProvider>
     </SessionProvider>
   );

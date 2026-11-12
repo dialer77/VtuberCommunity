@@ -4,6 +4,7 @@ import { PlayVideo } from "@/components/player/play-video";
 import { RemoteImage } from "@/components/remote-image";
 import { formatDate } from "@/lib/format";
 import { WatchedMark } from "@/components/watched-mark";
+import { ClipHiddenOverlay, ClipMenu } from "@/components/clip-menu";
 
 export function ClipTagChip({ tag, href, count }: { tag: ClipTag; href?: string; count?: number }) {
   const cls = "inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent";
@@ -31,7 +32,7 @@ export function ClipCard({ clip, reason }: { clip: Clip; reason?: string }) {
   const who = clip.vtubers.map((v) => v.name).join(", ");
   const tags = [clip.category, ...clip.moments].filter((t): t is ClipTag => !!t && t.id !== "etc").slice(0, 3);
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div className="relative flex min-w-0 flex-col gap-1.5">
       <PlayVideo
         video={{ id: clip.videoId, title: clip.title, channel: clip.channelTitle, clip: true, reason: reason ?? null }}
         className="group relative block aspect-video overflow-hidden rounded-lg bg-surface-2"
@@ -51,11 +52,15 @@ export function ClipCard({ clip, reason }: { clip: Clip; reason?: string }) {
           <ClipTagChip key={t.id} tag={t} />
         ))}
       </div>
-      <span className="text-xs text-muted-2 truncate">
-        {who ? `${who} · ` : ""}
-        {clip.channelTitle ?? "YouTube"} · {formatDate(clip.publishedAt)}
-        {clip.likes ? <span className="text-accent"> · ♥ {clip.likes}</span> : null}
-      </span>
+      <div className="flex items-center gap-1">
+        <span className="min-w-0 flex-1 text-xs text-muted-2 truncate">
+          {who ? `${who} · ` : ""}
+          {clip.channelTitle ?? "YouTube"} · {formatDate(clip.publishedAt)}
+          {clip.likes ? <span className="text-accent"> · ♥ {clip.likes}</span> : null}
+        </span>
+        <ClipMenu clip={clip} />
+      </div>
+      <ClipHiddenOverlay clip={clip} />
     </div>
   );
 }

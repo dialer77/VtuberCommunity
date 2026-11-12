@@ -6,7 +6,8 @@ import { Avatar } from "@/components/avatar";
 import { PlatformBadge } from "@/components/platform-badge";
 import { SearchIcon } from "@/components/search/header-search";
 import { formatCount, formatDate, formatYmd } from "@/lib/format";
-import type { SearchResponse, SearchResult, TagCount, TagKind, VmoaTag } from "@/types";
+import { ClipGrid } from "@/components/clip-card";
+import type { Clip, SearchResponse, SearchResult, TagCount, TagKind, VmoaTag } from "@/types";
 
 export const PAGE_SIZE = 30;
 const KIND_LABEL: Record<TagKind, string> = { agency: "소속사", concept: "컨셉", content: "콘텐츠" };
@@ -272,7 +273,41 @@ export function SearchView({ initial, initialQuery }: { initial: SearchResponse 
           </section>
         </>
       ) : null}
+
+      <ClipResults q={query.q} />
     </div>
+  );
+}
+
+/** 같은 검색어로 찾은 키리누키 (제목·요약·게임·사건·버튜버·채널) */
+function ClipResults({ q }: { q: string }) {
+  const [res, setRes] = useState<{ q: string; total: number; clips: Clip[] } | null>(null);
+  const text = q.trim();
+  useEffect(() => {
+    if (!text) return;
+    const ac = new AbortController();
+    const h = setTimeout(() => {
+      fetch(`/api/clip-search?q=${encodeURIComponent(text)}&limit=6`, { signal: ac.signal })
+        .then((r) => (r.ok ? r.json() : { total: 0, clips: [] }))
+        .then((j: { total?: number; clips?: Clip[] }) => setRes({ q: text, total: j.total ?? 0, clips: j.clips ?? [] }))
+        .catch(() => undefined);
+    }, 300);
+    return () => {
+      clearTimeout(h);
+      ac.abort();
+    };
+  }, [text]);
+  if (!text || !res || res.q !== text || res.total === 0) return null;
+  return (
+    <section className="flex flex-col gap-3" aria-label="키리누키 검색 결과">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-bold text-muted">키리누키 {formatCount(res.total)}개</h2>
+        <Link href={`/clips?q=${encodeURIComponent(text)}`} className="text-sm text-accent hover:underline">
+          클립 모두 보기 →
+        </Link>
+      </div>
+      <ClipGrid clips={res.clips} narrow />
+    </section>
   );
 }
 

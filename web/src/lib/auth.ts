@@ -61,10 +61,10 @@ const json = (body: unknown, status = 200) => Response.json(body, { status });
  * 로그인 사용자의 백엔드 사용자 API 호출을 대신한다 (시크릿은 서버에만 있음).
  * path 는 /api/user/:id 뒤에 붙는 경로.
  */
-export async function proxyUserApi(path: string, method: string, body?: string): Promise<Response> {
+export async function proxyUserApi(path: string, method: string, body?: string, maxBody = 4096): Promise<Response> {
   const uid = await currentUserId();
   if (!uid) return json({ error: "login_required" }, 401);
-  if (body && body.length > 4096) return json({ error: "too_large" }, 413);
+  if (body && body.length > maxBody) return json({ error: "too_large" }, 413);
   try {
     const res = await fetch(`${BACKEND}/api/user/${encodeURIComponent(uid)}${path}`, {
       method,

@@ -15,6 +15,8 @@ import { searchChannels } from "./search";
 import { youtubeForProfile, youtubeLiveItems } from "./youtube/view";
 import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
 import { BUNDLE_IDS, upNextFor } from "./clips/recommend";
+import { forYou } from "./clips/foryou";
+import { addWatched, clearWatched, getClipPrefs, getWatched, setClipPrefs } from "./userdb/watch";
 import { MOMENT_IDS } from "./clips/vocab";
 import {
   MAX_TITLE,
@@ -181,10 +183,76 @@ export function buildApi(store: SqliteStore) {
         videoId: i.row.videoId,
         title: i.row.title,
         channelTitle: i.row.channelTitle,
+        ytChannelId: i.row.ytChannelId,
+        topic: i.row.topic,
         reason: i.reason,
         bundle: i.bundle,
       })),
     };
+  });
+
+  // 내 취향 추천 — 본 기록·좋아요·취향 설정을 받아 계산만 하고 저장하지 않는다
+  app.post("/api/clips/for-you", async (req) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const ids = (v: unknown, max: number) =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && /^[\w-]{11}$/.test(x)).slice(-max) : [];
+    const strs = (v: unknown, max: number, len: number) =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.length > 0 && x.length <= len).slice(0, max) : [];
+    const r = forYou(store, {
+      watched: ids(b.watched, 500),
+      liked: ids(b.liked, 300),
+      disliked: ids(b.disliked, 300),
+      hiddenChannels: strs(b.hiddenChannels, 100, 40),
+      hiddenTopics: strs(b.hiddenTopics, 100, 40),
+      moments: strs(b.moments, 6, 20),
+      limit: Math.min(48, Math.max(6, Number(b.limit) || 24)),
+    });
+    const outs = toClipOuts(store, r.items.map((i) => i.row));
+    return { items: r.items.map((i, k) => ({ clip: outs[k], reason: i.reason })), basis: r.basis };
+  });
+
+  // 로그인 사용자의 본 기록·클립 취향 (여러 기기에서 같은 추천). 웹 /api/me/watched·/api/me/clip-prefs 가 대신 부른다
+  app.get("/api/user/:userId/watched", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId } = req.params as { userId: string };
+    return { items: await getWatched(userId) };
+  });
+
+  app.post("/api/user/:userId/watched", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId } = req.params as { userId: string };
+    const b = (req.body ?? {}) as { items?: unknown };
+    const items = Array.isArray(b.items)
+      ? (b.items as { videoId?: unknown; at?: unknown }[])
+          .filter((i) => typeof i?.videoId === "string" && typeof i?.at === "number")
+          .map((i) => ({ videoId: i.videoId as string, at: i.at as number }))
+      : [];
+    return { added: await addWatched(userId, items) };
+  });
+
+  app.delete("/api/user/:userId/watched", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId } = req.params as { userId: string };
+    await clearWatched(userId);
+    return { ok: true };
+  });
+
+  app.get("/api/user/:userId/clip-prefs", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId } = req.params as { userId: string };
+    return { prefs: await getClipPrefs(userId) };
+  });
+
+  app.put("/api/user/:userId/clip-prefs", async (req, reply) => {
+    if (!checkInternal(req, reply)) return reply;
+    const { userId } = req.params as { userId: string };
+    const prefs = (req.body as { prefs?: unknown } | null)?.prefs;
+    if (!prefs || typeof prefs !== "object" || JSON.stringify(prefs).length > 20_000) {
+      reply.code(400);
+      return { error: "invalid_prefs" };
+    }
+    await setClipPrefs(userId, prefs);
+    return { ok: true };
   });
 
   // 추천 묶음 측정 — 익명 합계만 (날짜·묶음별 노출·열기·재생 수). 사용자·IP 는 남기지 않는다
@@ -234,7 +302,7 @@ export function buildApi(store: SqliteStore) {
 
   // 키리누키 (버모아 분류). ?tag=<분류 태그>&platform=&channelId=&limit=24&offset=0
   app.get("/api/clips", async (req) => {
-    const q = req.query as { tag?: string; platform?: string; channelId?: string; limit?: string; offset?: string; sort?: string };
+    const q = req.query as { tag?: string; platform?: string; channelId?: string; limit?: string; offset?: string; sort?: string; q?: string };
     const limit = Math.min(60, Math.max(1, Number(q.limit) || 24));
     const offset = Math.max(0, Number(q.offset) || 0);
     const vtuber =
@@ -242,7 +310,12 @@ export function buildApi(store: SqliteStore) {
         ? { platform: q.platform as Platform, channelId: q.channelId }
         : undefined;
     const tag = q.tag && clipTagById(q.tag) ? q.tag : undefined;
-    const r = store.clips.listClips({ tag, vtuber, limit, offset, sort: q.sort === "likes" ? "likes" : "new" });
+    const sort = q.sort === "likes" ? "likes" : "new";
+    const text = typeof q.q === "string" ? q.q.trim().slice(0, 100) : "";
+    // 검색어가 있으면 제목·요약·게임·사건·버튜버 이름·채널명 검색 (clips/store.ts searchClips)
+    const r = text
+      ? store.clips.searchClips({ q: text, tag, vtuber, limit, offset, sort })
+      : store.clips.listClips({ tag, vtuber, limit, offset, sort });
     return { total: r.total, clips: toClipOuts(store, r.clips) };
   });
 

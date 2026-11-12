@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { ClipCard } from "@/components/clip-card";
 import { useWatched } from "@/lib/watched";
+import { clipHidden, useClipPrefs } from "@/lib/clip-prefs";
 import type { RecBundle } from "@/types";
 
 /** 묶음마다 보여 줄 카드 수 (서버는 여유분까지 보내고, 여기서 안 본 클립을 앞으로 보낸 뒤 자른다) */
@@ -54,9 +55,15 @@ export function RecBundles({ bundles }: { bundles: RecBundle[] }) {
 function Bundle({ bundle }: { bundle: RecBundle }) {
   const ref = useRef<HTMLElement>(null);
   const watched = useWatched();
-  // 안 본 클립 먼저 (서버 순서는 유지), 본 클립은 뒤로
-  const items = [...bundle.items.filter((i) => !watched.has(i.clip.videoId)), ...bundle.items.filter((i) => watched.has(i.clip.videoId))].slice(0, SHOW);
-  const fresh = items.filter((i) => !watched.has(i.clip.videoId)).length;
+  const prefs = useClipPrefs();
+  // 안 본 클립 먼저 (서버 순서는 유지) → 본 클립 → 추천에서 뺀 클립(관심 없음·숨긴 채널·덜 볼 주제)은 맨 뒤
+  const rank = (i: RecBundle["items"][number]) => (clipHidden(prefs, i.clip) ? 2 : watched.has(i.clip.videoId) ? 1 : 0);
+  const items = bundle.items
+    .map((i, k) => ({ i, k, r: rank(i) }))
+    .sort((a, b) => a.r - b.r || a.k - b.k)
+    .slice(0, SHOW)
+    .map((x) => x.i);
+  const fresh = items.filter((i) => rank(i) === 0).length;
 
   // 묶음이 화면에 40% 이상 보이면 노출 1회
   useEffect(() => {
@@ -81,14 +88,17 @@ function Bundle({ bundle }: { bundle: RecBundle }) {
       className="flex flex-col gap-3"
       onClickCapture={(e) => {
         const target = e.target as HTMLElement;
-        if (target.closest("button")) track({ b: bundle.id, t: "play" });
+        // 썸네일 재생 버튼만 '재생' (⋯ 메뉴·되돌리기 버튼은 세지 않음)
+        if (target.closest('button[aria-label^="재생"]')) track({ b: bundle.id, t: "play" });
         else if (target.closest('a[href^="/clips/"]')) track({ b: bundle.id, t: "open" });
       }}
     >
-      <h2 className="text-sm font-bold text-muted">
-        {bundle.title}
-        {fresh < items.length ? <span className="ml-2 font-normal text-muted-2">안 본 클립 {fresh}개</span> : null}
-      </h2>
+      {bundle.title ? (
+        <h2 className="text-sm font-bold text-muted">
+          {bundle.title}
+          {fresh < items.length ? <span className="ml-2 font-normal text-muted-2">안 본 클립 {fresh}개</span> : null}
+        </h2>
+      ) : null}
       <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3">
         {items.map((i) => (
           <div key={i.clip.videoId} className="flex min-w-0 flex-col gap-1.5">

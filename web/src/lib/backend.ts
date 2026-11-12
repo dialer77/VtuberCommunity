@@ -239,6 +239,8 @@ export async function fetchRisingFromBackend(
 
 /** 키리누키 목록 (버모아 분류 완료분, 최신순) */
 export async function fetchClips(q: {
+  /** 검색어 (제목·요약·게임·사건·버튜버·채널, '#태그') */
+  q?: string;
   tag?: string;
   sort?: "likes";
   vtuber?: { platform: string; channelId: string };
@@ -246,6 +248,7 @@ export async function fetchClips(q: {
   offset?: number;
 }): Promise<{ total: number; clips: Clip[] }> {
   const sp = new URLSearchParams();
+  if (q.q) sp.set("q", q.q);
   if (q.tag) sp.set("tag", q.tag);
   if (q.sort) sp.set("sort", q.sort);
   if (q.vtuber) {

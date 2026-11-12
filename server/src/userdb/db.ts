@@ -101,6 +101,24 @@ const MIGRATIONS: { id: number; sql: string }[] = [
       CREATE INDEX idx_clip_tag_votes_video ON clip_tag_votes(video_id);
     `,
   },
+  {
+    // R5 내 취향: 로그인 사용자의 본 클립 기록·클립 취향 설정 (여러 기기에서 같은 추천)
+    id: 3,
+    sql: `
+      CREATE TABLE watch_history (
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        video_id   TEXT NOT NULL,
+        watched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (user_id, video_id)
+      );
+      CREATE INDEX idx_watch_history_recent ON watch_history(user_id, watched_at DESC);
+      CREATE TABLE user_clip_prefs (
+        user_id    TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        prefs      JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `,
+  },
 ];
 
 /** 아직 적용되지 않은 스키마 변경을 순서대로 적용 */

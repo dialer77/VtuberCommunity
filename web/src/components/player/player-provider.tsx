@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { loadYouTubeApi, type YTPlayer } from "@/components/player/youtube-api";
 import { markWatched, useWatched } from "@/lib/watched";
+import { isHiddenByPrefs, useClipPrefs } from "@/lib/clip-prefs";
 
 /** 사이트 안에서 재생할 유튜브 영상 */
 export interface PlayerVideo {
@@ -23,6 +24,8 @@ interface UpNextItem {
   videoId: string;
   title: string;
   channelTitle: string | null;
+  ytChannelId: string;
+  topic: string | null;
   reason: string;
 }
 
@@ -77,6 +80,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   });
   const [candidates, setCandidates] = useState<{ for: string; items: UpNextItem[] } | null>(null);
   const watched = useWatched();
+  const prefs = useClipPrefs();
   // 이번 이어보기에서 이미 튼 영상 (같은 영상이 돌고 돌지 않게)
   const [played, setPlayed] = useState<ReadonlySet<string>>(new Set());
 
@@ -116,7 +120,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // 다음 클립 = 이어보기 후보 중 아직 안 봤고 이번에 이미 튼 적 없는 첫 클립
   const upNext =
     video?.clip && candidates?.for === video.id
-      ? (candidates.items.find((c) => !watched.has(c.videoId) && !played.has(c.videoId)) ?? null)
+      ? (candidates.items.find((c) => !watched.has(c.videoId) && !played.has(c.videoId) && !isHiddenByPrefs(prefs, c)) ?? null)
       : null;
 
   const goNext = useCallback(() => {

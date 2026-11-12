@@ -13,7 +13,7 @@ import { clipTagById } from "./vocab";
 import { bigrams, jaccard, similarity, textOf } from "./similar";
 import { isGenericTopic } from "./topics";
 
-export const BUNDLE_IDS = ["same_source", "same_event", "same_vtuber", "same_scene", "co_star"] as const;
+export const BUNDLE_IDS = ["same_source", "same_event", "same_vtuber", "same_scene", "co_star", "for_you"] as const;
 export type BundleId = (typeof BUNDLE_IDS)[number];
 
 export interface RecItem {
