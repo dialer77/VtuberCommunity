@@ -41,6 +41,7 @@
 - 키리누키 참여 (4단계, 로그인 기반 — 사용자 DB·구글 로그인 설정 후 켜짐): 클립 좋아요(`/clips?sort=likes` 좋아요순), 내 재생목록(만들기·담기·이름 바꾸기·전체 재생 — 공식 임베드 `playlist` 매개변수), '어떤 순간' 태그 투표(찬반 2표 차이로 분류에 반영), 내 페이지 "내 재생목록"·"좋아요한 클립". 사용자 DB `userdb/clips.ts`, 합계는 수집 DB 에 복사
 - 키리누키 수집·분류 (3단계): 키리누키 채널 발견(`search.list` 하루 20회, 채널 ID 만) → RSS 추적 → Claude 헤드리스 분류(누가·무엇을·어떤 순간·한 줄 요약, RSS 제목·설명만 입력) → 비슷한 클립(같은 버튜버·다른 버튜버). `/clips` 모음·태그별, `/clips/<ID>` 상세, 프로필 "키리누키" 탭(특징 태그). 코드 `server/src/clips/`, 운영 `deploy\windows\clips.ps1`, `docs/youtube-api.md` 4장
 - 버튜버 검색 (`/search`, 2026-11-11): 방송 중이 아니어도 수집 DB 의 채널 전체를 이름·예전 이름(일별 집계)·확정 목록 이름·유튜브 채널명·초성(`ㅅㅌ`)·`#태그` 로 검색. 태그 칩(소속사·컨셉·콘텐츠, 여러 개 = 모두 만족), 태그 이름을 그대로 쓰면 그 태그 버튜버도 함께, 검색어 없으면 최근 30일 많이 본 순. 헤더 검색창(좁은 화면은 아이콘), 프로필의 태그를 누르면 같은 태그 버튜버 목록. 코드 `server/src/search.ts`(메모리 색인 10분 갱신), `web/src/components/search/`
+- 애드센스 연결 (2026-11-12): Vercel `NEXT_PUBLIC_ADSENSE_CLIENT`(공개 값) → `<head>` async 스크립트, `google-adsense-account` 메타 태그, `/ads.txt`. 광고 칸은 `NEXT_PUBLIC_ADSENSE_SLOT_HOME_MID`·`_ISSUE_BOTTOM`(광고 단위 숫자 ID)이 있을 때만 그림 (`web/src/components/ad-slot.tsx`)
 
 ### 코드는 배포됐고, 사용자가 설정해야 켜지는 것
 배포 PC 작업은 RDP 로 사용자가 직접 실행합니다.
@@ -50,6 +51,7 @@
 - [ ] **키리누키 확인** (배포 후 하루쯤): `deploy\windows\clips.ps1 status` 로 채널·클립이 쌓이는지, `recent 30` 으로 분류가 맞는지 보고, 클립 채널이 아닌 것은 `block`. 분류는 Claude 구독 토큰을 쓰므로 **이슈 수집 토큰 교체 전에는 실패할 수 있음** (30분 뒤 자동 재시도). 서버 `.env` 에 `ISSUES_ENABLED=1` 이 없으면 `CLIPS_ENABLED=1` 을 넣어야 켜짐
 - [ ] **사용자 DB**: `deploy\windows\setup-userdb.ps1` (`docs/user-accounts.md` 1단계). 최애·알림에 더해 4단계(좋아요·재생목록·태그 투표)도 이게 있어야 켜짐
 - [ ] **구글 로그인**: Google OAuth 클라이언트 발급 → Vercel 환경변수 5개 → 재배포 (`docs/user-accounts.md` 2·3단계)
+- [ ] **애드센스 검토**: 애드센스 화면에서 사이트 소유권 확인(코드 스니펫·메타 태그·ads.txt 모두 적용됨) → 검토 요청. 승인되면 자동 광고를 켜거나, 광고 단위를 만들어 숫자 ID 를 Vercel `NEXT_PUBLIC_ADSENSE_SLOT_*` 에 넣고 재배포
 - [ ] **이슈 수집 토큰 교체**: 사용자가 Claude 계정을 바꿀 예정이라 새 계정으로 다시 발급 — `deploy\windows\setup-issues.ps1 -RenewToken`
 
 ### 아직 확인하지 못한 것
