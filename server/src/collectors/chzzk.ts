@@ -20,6 +20,8 @@ interface ChzzkLive {
   openDate: string; // "2026-07-14 13:03:14" (KST)
   tags: string[] | null;
   liveCategoryValue: string | null;
+  /** 성인(19세) 방송 */
+  adult?: boolean;
   channel: { channelId: string; channelName: string };
 }
 
@@ -61,7 +63,8 @@ export class ChzzkCollector implements Collector {
             category: l.liveCategoryValue,
             viewers: l.concurrentUserCount,
             startedAt: kstToISO(l.openDate),
-            thumbnailUrl: toThumbUrl(l.liveImageUrl),
+            // 성인(19세) 방송은 썸네일을 쓰지 않는다 — 광고가 붙는 페이지에 성인 화면이 뜨지 않게
+            thumbnailUrl: l.adult ? null : toThumbUrl(l.liveImageUrl),
             tags: l.tags ?? [],
           });
         }

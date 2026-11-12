@@ -167,6 +167,15 @@ export function buildApi(store: SqliteStore) {
     });
   });
 
+  // 사이트맵 재료 — 검색 노출 대상 프로필(방송 3회 이상 또는 최근 90일 방송) + 보이는 클립
+  app.get("/api/sitemap", async () => {
+    const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    return {
+      channels: store.indexableChannels(3, since),
+      clips: store.clips.sitemapClips(20_000),
+    };
+  });
+
   // 채널 프로필 (자동 데이터 + VMOA 태그 + 큐레이션 정보)
   app.get("/api/channels/:platform/:channelId", async (req, reply) => {
     const { channelId } = req.params as { platform: string; channelId: string };

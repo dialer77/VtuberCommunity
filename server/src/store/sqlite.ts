@@ -83,6 +83,8 @@ export interface Broadcast {
   peakViewers: number;
   firstSeenAt: string;
   lastSeenAt: string;
+  /** 스냅샷 보관 기간(RETENTION_DAYS)이 지난 방송 — 일별 집계로 남은 날짜(KST, YYYY-MM-DD). 시각·카테고리는 없음 */
+  day?: string;
 }
 
 /** 채널 프로필 (DB에서 파생한 자동 데이터) */
@@ -481,6 +483,39 @@ export class SqliteStore implements Store {
       lastSeenAt: (r.last_at as string | null) ?? "",
     }));
 
+    // 스냅샷은 RETENTION_DAYS(기본 7일)만 남는다 — 그 이전 방송·통계는 오래 남는 표로 잇는다
+    // (방송별 태그 기록 = 방송 1건당 1행, 일별 집계 = 날짜별 마지막 제목·최고 동접)
+    const totalBroadcasts = (
+      this.db.prepare(`SELECT COUNT(*) AS c FROM broadcast_tags WHERE channel_id = ?`).get(channelId) as { c: number }
+    ).c;
+    const dailyPeak = (
+      this.db.prepare(`SELECT MAX(peak_viewers) AS p FROM channel_daily WHERE channel_id = ?`).get(channelId) as {
+        p: number | null;
+      }
+    ).p;
+    const oldest = broadcasts.at(-1)?.startedAt;
+    const before = oldest ? kstDate(Date.parse(oldest)) : "9999-12-31";
+    const room = 30 - broadcasts.length;
+    if (room > 0) {
+      const days = this.db
+        .prepare(
+          `SELECT date, last_title, peak_viewers FROM channel_daily
+           WHERE channel_id = ? AND date < ? AND live_minutes > 0 ORDER BY date DESC LIMIT ?`,
+        )
+        .all(channelId, before, room) as unknown as Array<{ date: string; last_title: string | null; peak_viewers: number }>;
+      for (const d of days) {
+        broadcasts.push({
+          startedAt: new Date(`${d.date}T00:00:00+09:00`).toISOString(),
+          title: d.last_title,
+          category: null,
+          peakViewers: d.peak_viewers,
+          firstSeenAt: "",
+          lastSeenAt: "",
+          day: d.date,
+        });
+      }
+    }
+
     return {
       channelId,
       platform,
@@ -491,9 +526,10 @@ export class SqliteStore implements Store {
       isLive,
       currentViewers: isLive ? Number(current!.viewers) : null,
       currentTitle: isLive ? ((current!.title as string | null) ?? null) : null,
-      peakViewers: Number(peak ?? 0),
-      broadcastCount: Number(count),
-      rawTags: isLive ? parseTags(current!.tags) : parseTags(current?.tags),
+      peakViewers: Math.max(Number(peak ?? 0), Number(dailyPeak ?? 0)),
+      broadcastCount: Math.max(Number(count), Number(totalBroadcasts)),
+      // 스냅샷이 정리된 채널은 마지막 방송의 자가 태그로 (프로필 태그가 비지 않게)
+      rawTags: current ? parseTags(current.tags) : this.lastRawTags(channelId),
       broadcasts,
     };
   }
@@ -1149,6 +1185,23 @@ export class SqliteStore implements Store {
     }));
 
     return { channels, aliases, lastTags, activity };
+  }
+
+  /**
+   * 검색엔진에 내보낼 채널 — 방송 minBroadcasts 회 이상이거나 sinceIso 이후 방송한 채널.
+   * 웹 프로필의 noindex 기준(web/src/lib/seo.ts)과 같게 유지한다.
+   */
+  indexableChannels(minBroadcasts: number, sinceIso: string): { platform: Platform; channelId: string; lastLiveAt: string }[] {
+    const rows = this.db
+      .prepare(`
+        SELECT c.platform, b.channel_id, COUNT(*) AS n, MAX(b.started_at) AS last
+        FROM broadcast_tags b JOIN channels c ON c.channel_id = b.channel_id
+        GROUP BY b.channel_id
+        HAVING n >= ? OR last >= ?
+        ORDER BY last DESC
+      `)
+      .all(minBroadcasts, sinceIso) as unknown as Array<{ platform: Platform; channel_id: string; last: string }>;
+    return rows.map((r) => ({ platform: r.platform, channelId: r.channel_id, lastLiveAt: r.last }));
   }
 
   /** 채널의 마지막 방송 자가 태그 (유튜브 방송에 버튜버 태그를 붙일 때) */

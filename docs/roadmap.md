@@ -42,6 +42,7 @@
 - 키리누키 수집·분류 (3단계): 키리누키 채널 발견(`search.list` 하루 20회, 채널 ID 만) → RSS 추적 → Claude 헤드리스 분류(누가·무엇을·어떤 순간·한 줄 요약, RSS 제목·설명만 입력) → 비슷한 클립(같은 버튜버·다른 버튜버). `/clips` 모음·태그별, `/clips/<ID>` 상세, 프로필 "키리누키" 탭(특징 태그). 코드 `server/src/clips/`, 운영 `deploy\windows\clips.ps1`, `docs/youtube-api.md` 4장
 - 버튜버 검색 (`/search`, 2026-11-11): 방송 중이 아니어도 수집 DB 의 채널 전체를 이름·예전 이름(일별 집계)·확정 목록 이름·유튜브 채널명·초성(`ㅅㅌ`)·`#태그` 로 검색. 태그 칩(소속사·컨셉·콘텐츠, 여러 개 = 모두 만족), 태그 이름을 그대로 쓰면 그 태그 버튜버도 함께, 검색어 없으면 최근 30일 많이 본 순. 헤더 검색창(좁은 화면은 아이콘), 프로필의 태그를 누르면 같은 태그 버튜버 목록. 코드 `server/src/search.ts`(메모리 색인 10분 갱신), `web/src/components/search/`
 - 애드센스 연결 (2026-11-12): Vercel `NEXT_PUBLIC_ADSENSE_CLIENT`(공개 값) → `<head>` async 스크립트, `google-adsense-account` 메타 태그, `/ads.txt`. 광고 칸은 `NEXT_PUBLIC_ADSENSE_SLOT_HOME_MID`·`_ISSUE_BOTTOM`(광고 단위 숫자 ID)이 있을 때만 그림 (`web/src/components/ad-slot.tsx`)
+- 검색 노출 보강 (2026-11-12): 사이트맵에 버튜버 프로필(방송 3회 이상 또는 최근 90일 방송, `/api/sitemap`)·키리누키 상세 추가, 프로필 제목 `이름 (플랫폼) 방송 기록·클립`·설명문(소속사·주로 하는 방송·최근 방송일·기록, 방송 제목은 넣지 않음)·canonical·JSON-LD(ProfilePage), 기준 미달 프로필 noindex (`web/src/lib/seo.ts` — 서버 기준과 같게 유지), 프로필 "주로 하는 방송" 요약(카테고리·제목 키워드, 실사·코스프레 같은 민감한 방송 종류는 일부러 제외). 프로필 통계·방송 기록은 스냅샷 보관(7일) 이후에도 방송별 태그 기록·일별 집계로 이어서 보여 줌 (오래된 방송은 날짜·마지막 제목·최고 동접만). 치지직 성인(19세) 방송은 썸네일을 받지 않음 (광고 페이지 안전)
 
 ### 코드는 배포됐고, 사용자가 설정해야 켜지는 것
 배포 PC 작업은 RDP 로 사용자가 직접 실행합니다.
@@ -158,6 +159,8 @@
 
 ## 7. 알려진 문제·정리 대상
 
+- "주로 하는 방송"의 카테고리는 스냅샷이 있는 최근 7일 방송에서만 나온다 (일별 집계에 카테고리가 없음). 필요하면 `channel_daily` 에 마지막 카테고리 열을 추가
+- SOOP 성인 방송 여부는 아직 확인하지 않음 (치지직만 썸네일 제외)
 - 검색은 버모아가 방송을 한 번이라도 본 채널만 나온다 (프로필 페이지가 있는 채널). 확정 목록(`vtuber_registry`)에만 있고 방송을 아직 못 본 채널은 나오지 않음
 - `web/src/components/theme-toggle.tsx` 에 예전부터 있던 lint 오류 (기능과 무관)
 - `docs/deploy-fly.md`, `docs/deploy-railway.md`, `docs/backend-architecture.md` 는 예전 계획. 현재 배포는 Windows PC + Cloudflare Tunnel

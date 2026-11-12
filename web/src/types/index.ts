@@ -181,6 +181,8 @@ export interface Broadcast {
   peakViewers: number;
   firstSeenAt: string;
   lastSeenAt: string;
+  /** 오래된 방송(스냅샷 보관 기간 이후)은 날짜만 남는다 — KST YYYY-MM-DD */
+  day?: string;
 }
 
 /** 관리자 큐레이션 프로필 정보 */

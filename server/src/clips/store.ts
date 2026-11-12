@@ -364,6 +364,18 @@ export class ClipRepo {
     return this.hydrate(rows);
   }
 
+  /** 사이트맵용 — 보이는 클립 ID·게시일 (최신순) */
+  sitemapClips(limit: number): { videoId: string; publishedAt: string }[] {
+    const rows = this.db
+      .prepare(`
+        SELECT c.video_id, c.published_at FROM clips c
+        JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
+        WHERE ${VISIBLE} ORDER BY c.published_at DESC LIMIT ?
+      `)
+      .all(limit) as unknown as Array<{ video_id: string; published_at: string }>;
+    return rows.map((r) => ({ videoId: r.video_id, publishedAt: r.published_at }));
+  }
+
   getClip(videoId: string, visibleOnly = true): ClipRow | null {
     return this.selectClips(`c.video_id = ?${visibleOnly ? ` AND ${VISIBLE}` : ""}`, "", [videoId])[0] ?? null;
   }

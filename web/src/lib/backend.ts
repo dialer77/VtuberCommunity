@@ -273,6 +273,17 @@ export async function fetchClip(videoId: string): Promise<ClipDetail | null> {
   return (await res.json()) as ClipDetail;
 }
 
+/** 사이트맵 재료 — 검색 노출 대상 프로필 + 보이는 클립 */
+export async function fetchSitemapEntries(): Promise<{
+  channels: { platform: Platform; channelId: string; lastLiveAt: string }[];
+  clips: { videoId: string; publishedAt: string }[];
+}> {
+  const res = await fetch(`${BASE}/api/sitemap`, { cache: "no-store", signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`backend /api/sitemap ${res.status}`);
+  const json = (await res.json()) as { channels?: []; clips?: [] };
+  return { channels: json.channels ?? [], clips: json.clips ?? [] };
+}
+
 /** 버튜버 검색 — 이름·초성·'#태그', tags 는 모두 만족 */
 export async function fetchSearch(q: {
   q?: string;

@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import { getChannelProfile } from "@/lib/data";
 import { Avatar } from "@/components/avatar";
 import { PlatformBadge } from "@/components/platform-badge";
-import { formatCount, formatDate, formatDateTime } from "@/lib/format";
+import { formatCount, formatDate, formatDateTime, formatYmd } from "@/lib/format";
 import { FavoriteButton } from "@/components/auth/favorite-button";
 import { YoutubeLiveBox, YoutubeVideos } from "@/components/youtube-videos";
 import { ClipGrid, ClipNotice, ClipTagChip } from "@/components/clip-card";
+import { isIndexableProfile, profileDescription, profileTopics } from "@/lib/seo";
+import { PLATFORMS } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +24,16 @@ export async function generateMetadata({
   const { platform, channelId } = await params;
   const p = await getChannelProfile(platform, channelId);
   if (!p) return { title: "스트리머를 찾을 수 없음" };
+  const description = profileDescription(p);
+  const title = `${p.name} (${PLATFORMS[p.platform].label}) 방송 기록·클립`;
   return {
-    title: p.name,
-    description: `${p.name} — 방송 현황·기록·통계. ${p.tags.map((t) => t.label).join(", ")}`,
+    title,
+    description,
+    // ?tab= 등은 같은 페이지 — 기본 주소 하나로 모은다
+    alternates: { canonical: `/vtuber/${p.platform}/${encodeURIComponent(p.channelId)}` },
+    // 방송 기록이 거의 없는 채널은 검색 노출에서 뺀다 (빈약한 페이지가 많으면 사이트 평가에 불리)
+    robots: isIndexableProfile(p) ? undefined : { index: false, follow: true },
+    openGraph: { title, description, type: "profile" },
   };
 }
 
@@ -43,9 +52,27 @@ export default async function VtuberProfilePage({
   const activeTab: "history" | "videos" | "clips" =
     tab === "videos" && yt ? "videos" : tab === "clips" && clips ? "clips" : "history";
   const base = `/vtuber/${p.platform}/${p.channelId}`;
+  const topics = profileTopics(p.broadcasts);
+  // 구조화 데이터 (검색엔진용) — 공식 채널 주소를 sameAs 로
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    name: `${p.name} 방송 기록·클립`,
+    url: `${process.env.SITE_URL ?? ""}${base}`,
+    mainEntity: {
+      "@type": "Person",
+      name: p.name,
+      description: profileDescription(p),
+      sameAs: [p.channelUrl, ...(yt ? [yt.url] : [])],
+    },
+  };
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-6">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
       <Link
         href="/"
         className="text-sm text-muted hover:text-accent transition-colors w-fit"
@@ -87,6 +114,12 @@ export default async function VtuberProfilePage({
                   </Link>
                 ))}
               </div>
+            ) : null}
+            {topics.length > 0 ? (
+              <p className="mt-1.5 text-xs text-muted-2">
+                주로 하는 방송{" "}
+                <span className="text-muted">{topics.map((t) => t.label).join(" · ")}</span>
+              </p>
             ) : null}
           </div>
           <FavoriteButton target={{ platform: p.platform, channelId: p.channelId, channelName: p.name }} />
@@ -220,7 +253,7 @@ export default async function VtuberProfilePage({
                     {b.title ?? "제목 없음"}
                   </p>
                   <p className="text-xs text-muted-2">
-                    {b.startedAt ? formatDateTime(b.startedAt) : "-"}
+                    {b.day ? formatYmd(b.day) : b.startedAt ? formatDateTime(b.startedAt) : "-"}
                     {b.category ? ` · ${b.category}` : ""}
                   </p>
                 </div>
