@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import localFont from "next/font/local";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -53,6 +52,8 @@ export const metadata: Metadata = {
       ? { "naver-site-verification": process.env.NAVER_SITE_VERIFICATION }
       : undefined,
   },
+  // 애드센스 사이트 소유권 확인 (메타 태그 방식). 광고 스크립트는 페이지가 뜬 뒤에 붙어서 검사기가 못 볼 수 있다
+  other: ADSENSE_CLIENT ? { "google-adsense-account": ADSENSE_CLIENT } : undefined,
 };
 
 // 페인트 전에 저장된 테마를 적용해 깜빡임(FOUC) 방지
@@ -70,13 +71,12 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans">
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        {/* 애드센스: 공식 안내대로 HTML 에 그대로 들어가는 async 스크립트 (React 가 <head> 로 옮긴다). next/script 는 HTML 에 preload 만 남아 소유권 확인에서 못 찾을 수 있다 */}
         {ADSENSE_CLIENT ? (
-          <Script
-            id="adsbygoogle-init"
+          <script
             async
-            strategy="afterInteractive"
-            crossOrigin="anonymous"
             src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT}`}
+            crossOrigin="anonymous"
           />
         ) : null}
         {/* 전역 유튜브 플레이어 — 페이지를 옮겨도 재생이 이어진다 */}
