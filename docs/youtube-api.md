@@ -108,7 +108,13 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 channels auto 
 powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 recent 30          # 최근 분류 결과 확인
 powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 block "채널 이름"   # 클립 채널이 아니면 차단
 powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 add https://www.youtube.com/@채널 "유즈하 리코"   # 아는 키리누키 채널 직접 추가
+powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 enrich              # 예전 분류 보강 1회 (대표 순간·주제 통일·사건). 새 클립이 없으면 30분마다 자동
+powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 topics 80           # 많이 쓰인 주제 이름 — 같은 게임이 다른 이름으로 갈렸는지
+powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 alias 마크 마인크래프트   # 주제 이름 통일 (기존 클립에도 반영)
+powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 events 14           # 최근 사건·밈 이름과 클립 수
 ```
+
+분류 2판(2026-11-12): 대표 순간 1개 + 보조 순간, 주제 정식 이름(이미 쓰는 이름·별칭 사전), 사건·밈 이름, 원본 방송(설명의 치지직·SOOP 다시보기 링크·날짜). 분류 입력은 계속 RSS 제목·설명뿐이고, 기존 클립 보강은 RSS 로 만든 기존 분류(요약·주제)와 videos.list 로 바뀐 적 없는 제목만 쓴다.
 
 ## 할당량
 

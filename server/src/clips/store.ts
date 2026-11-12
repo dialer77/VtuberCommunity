@@ -12,6 +12,7 @@
 // RSS 에서 빠진 클립은 20일마다 videos.list 로 남아 있는지 확인하고, 30일 넘게 확인 못 한 클립은 지운다.
 import type { DatabaseSync } from "node:sqlite";
 import type { Platform } from "../domain";
+import { topicKey } from "./topics";
 
 export type ClipChannelStatus = "auto" | "approved" | "blocked";
 export type ClassStatus = "pending" | "done" | "not_clip" | "failed";
@@ -46,6 +47,19 @@ export interface ClipRow {
   hintPlatform: Platform | null;
   hintChannelId: string | null;
   likes: number;
+  /** 대표 순간 (moments[0] 과 같음, 투표로 빠졌으면 null) */
+  primaryMoment: string | null;
+  /** 사건·밈 이름 (같은 일을 다룬 클립을 묶는다) */
+  event: string | null;
+  /** 원본 방송 다시보기 */
+  sourceUrl: string | null;
+  sourceKey: string | null;
+  /** 원본 방송 날짜 (KST YYYY-MM-DD) */
+  sourceDate: string | null;
+  /** 분류 버전 — CLASS_VER 보다 낮으면 보강 대상 */
+  classVer: number;
+  /** videos.list 로 확인한 시각 (있으면 제목이 API 값으로 바뀌었을 수 있음) */
+  checkedAt: string | null;
 }
 
 export interface ClipClass {
@@ -54,9 +68,25 @@ export interface ClipClass {
   category: string | null;
   topic: string | null;
   summary: string | null;
+  /** [0] 이 대표 순간 */
   moments: string[];
   vtubers: { platform: Platform; channelId: string }[];
+  event: string | null;
+  source: { url: string; key: string } | null;
+  sourceDate: string | null;
 }
+
+/** 기존 클립 보강 (대표 순간·주제 이름·사건). 버튜버·카테고리·요약은 그대로 */
+export interface ClipEnrich {
+  videoId: string;
+  /** [0] 이 대표 순간 */
+  moments: string[];
+  topic: string | null;
+  event: string | null;
+}
+
+/** 지금 분류 버전 — 1: 처음 분류, 2: 대표 순간·주제 통일·사건·원본 방송 */
+export const CLASS_VER = 2;
 
 /** 태그 투표 반영 기준: Claude 태그는 반대가 찬성보다 이만큼 많으면 빼고, 없는 태그는 찬성이 이만큼 많으면 붙인다 */
 export const VOTE_MARGIN = 2;
@@ -153,6 +183,33 @@ export class ClipRepo {
         )
         UNION
         SELECT v.video_id, v.tag FROM clip_vote_tags v WHERE v.up - v.down >= ${VOTE_MARGIN};
+    `);
+    this.addColumns();
+  }
+
+  /** 분류 2판(대표 순간·사건·원본 방송) 열 — 기존 DB 에도 붙인다 */
+  private addColumns(): void {
+    const cols = new Set(
+      (this.db.prepare(`PRAGMA table_info(clips)`).all() as unknown as Array<{ name: string }>).map((c) => c.name),
+    );
+    const add = (name: string, def: string) => {
+      if (!cols.has(name)) this.db.exec(`ALTER TABLE clips ADD COLUMN ${name} ${def}`);
+    };
+    add("primary_moment", "TEXT");
+    add("event", "TEXT");
+    add("source_url", "TEXT");
+    add("source_key", "TEXT");
+    add("source_date", "TEXT");
+    add("class_ver", "INTEGER NOT NULL DEFAULT 1");
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_clips_event ON clips(event);
+      CREATE INDEX IF NOT EXISTS idx_clips_source ON clips(source_key);
+      CREATE TABLE IF NOT EXISTS clip_topic_alias (
+        alias      TEXT PRIMARY KEY,
+        topic      TEXT NOT NULL,
+        source     TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
     `);
   }
 
@@ -331,6 +388,9 @@ export class ClipRepo {
     return rows.map((r) => {
       const id = r.video_id as string;
       const category = str(r.category);
+      const tagsAll = (tgMap.get(id) ?? []).filter((t) => t !== category);
+      const stored = str(r.primary_moment);
+      const primary = stored && tagsAll.includes(stored) ? stored : null;
       return {
         videoId: id,
         ytChannelId: r.yt_channel_id as string,
@@ -342,12 +402,19 @@ export class ClipRepo {
         category,
         topic: str(r.topic),
         summary: str(r.summary),
-        moments: (tgMap.get(id) ?? []).filter((t) => t !== category),
+        moments: primary ? [primary, ...tagsAll.filter((t) => t !== primary)] : tagsAll,
         vtubers: vtMap.get(id) ?? [],
         channelTitle: str(r.ch_title),
         likes: Number(r.likes ?? 0),
         hintPlatform: (str(r.hint_platform) as Platform | null) ?? null,
         hintChannelId: str(r.hint_channel_id),
+        primaryMoment: primary,
+        event: str(r.event),
+        sourceUrl: str(r.source_url),
+        sourceKey: str(r.source_key),
+        sourceDate: str(r.source_date),
+        classVer: Number(r.class_ver ?? 1),
+        checkedAt: str(r.checked_at),
       };
     });
   }
@@ -401,7 +468,9 @@ export class ClipRepo {
   saveClassification(results: ClipClass[]): void {
     const now = new Date().toISOString();
     const upd = this.db.prepare(`
-      UPDATE clips SET class_status = ?, class_at = ?, category = ?, topic = ?, summary = ?, description = NULL WHERE video_id = ?
+      UPDATE clips SET class_status = ?, class_at = ?, category = ?, topic = ?, summary = ?, description = NULL,
+        primary_moment = ?, event = ?, source_url = ?, source_key = ?, source_date = ?, class_ver = ?
+      WHERE video_id = ?
     `);
     const delV = this.db.prepare(`DELETE FROM clip_vtubers WHERE video_id = ?`);
     const delT = this.db.prepare(`DELETE FROM clip_tags WHERE video_id = ?`);
@@ -410,7 +479,20 @@ export class ClipRepo {
     this.db.exec("BEGIN");
     try {
       for (const r of results) {
-        upd.run(r.isClip ? "done" : "not_clip", now, r.category, r.topic, r.summary, r.videoId);
+        upd.run(
+          r.isClip ? "done" : "not_clip",
+          now,
+          r.category,
+          r.topic,
+          r.summary,
+          r.moments[0] ?? null,
+          r.event,
+          r.source?.url ?? null,
+          r.source?.key ?? null,
+          r.sourceDate,
+          CLASS_VER,
+          r.videoId,
+        );
         delV.run(r.videoId);
         delT.run(r.videoId);
         if (!r.isClip) continue;
@@ -423,6 +505,100 @@ export class ClipRepo {
       this.db.exec("ROLLBACK");
       throw e;
     }
+  }
+
+  /** 보강 대상: 예전 버전으로 분류된 클립 (좋아요 많은·최신 순) */
+  enrichPool(limit: number): ClipRow[] {
+    return this.selectClips(
+      `c.class_status = 'done' AND c.class_ver < ? AND ch.status != 'blocked'`,
+      `ORDER BY COALESCE(st.likes, 0) DESC, c.published_at DESC LIMIT ?`,
+      [CLASS_VER, limit],
+    );
+  }
+
+  /** 보강 결과 저장 — 순간 태그만 바꾸고(카테고리 태그는 그대로) 주제·사건·대표 순간 기록 */
+  saveEnrichment(results: ClipEnrich[]): void {
+    const upd = this.db.prepare(
+      `UPDATE clips SET primary_moment = ?, topic = COALESCE(?, topic), event = ?, class_ver = ? WHERE video_id = ?`,
+    );
+    const delM = this.db.prepare(
+      `DELETE FROM clip_tags WHERE video_id = ? AND tag != COALESCE((SELECT category FROM clips WHERE video_id = ?), '')`,
+    );
+    const insT = this.db.prepare(`INSERT OR IGNORE INTO clip_tags (video_id, tag) VALUES (?, ?)`);
+    this.db.exec("BEGIN");
+    try {
+      for (const r of results) {
+        upd.run(r.moments[0] ?? null, r.topic, r.event, CLASS_VER, r.videoId);
+        if (r.moments.length === 0) continue; // 순간을 못 정했으면 기존 태그 유지
+        delM.run(r.videoId, r.videoId);
+        for (const m of r.moments) insT.run(r.videoId, m);
+      }
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+
+  /** 분류 버전별 클립 수 (보강 진행 상황) */
+  classVerCounts(): Record<string, number> {
+    const rows = this.db
+      .prepare(`SELECT class_ver AS v, COUNT(*) AS n FROM clips WHERE class_status = 'done' GROUP BY class_ver`)
+      .all() as unknown as Array<{ v: number; n: number }>;
+    return Object.fromEntries(rows.map((r) => [`v${r.v}`, Number(r.n)]));
+  }
+
+  /** 주제 별칭 사전 (정규화한 별칭 → 정식 이름) */
+  topicAliasMap(): Map<string, string> {
+    const rows = this.db.prepare(`SELECT alias, topic FROM clip_topic_alias`).all() as unknown as Array<{ alias: string; topic: string }>;
+    return new Map(rows.map((r) => [r.alias, r.topic]));
+  }
+
+  /** 별칭 등록 + 기존 클립의 주제도 바꿈. 바꾼 클립 수 */
+  setTopicAlias(aliasRaw: string, topic: string, source: "manual" | "seed"): number {
+    const alias = topicKey(aliasRaw);
+    const to = topic.replace(/\s+/g, " ").trim();
+    if (!alias || !to) return 0;
+    this.db
+      .prepare(
+        `INSERT INTO clip_topic_alias (alias, topic, source, updated_at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(alias) DO UPDATE SET topic = excluded.topic, source = excluded.source, updated_at = excluded.updated_at`,
+      )
+      .run(alias, to, source, new Date().toISOString());
+    const rows = this.db.prepare(`SELECT DISTINCT topic FROM clips WHERE topic IS NOT NULL`).all() as unknown as Array<{ topic: string }>;
+    const upd = this.db.prepare(`UPDATE clips SET topic = ? WHERE topic = ?`);
+    let changed = 0;
+    for (const r of rows) {
+      if (r.topic !== to && topicKey(r.topic) === alias) changed += Number(upd.run(to, r.topic).changes);
+    }
+    return changed;
+  }
+
+  /** 많이 쓰인 주제 이름 (분류 프롬프트에 보여 주고 그대로 쓰게 한다) */
+  allTopics(limit: number): { topic: string; count: number }[] {
+    const rows = this.db
+      .prepare(`
+        SELECT c.topic AS topic, COUNT(*) AS n FROM clips c
+        JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
+        WHERE ${VISIBLE} AND c.topic IS NOT NULL AND c.topic != ''
+        GROUP BY c.topic ORDER BY n DESC LIMIT ?
+      `)
+      .all(limit) as unknown as Array<{ topic: string; n: number }>;
+    return rows.map((r) => ({ topic: r.topic, count: Number(r.n) }));
+  }
+
+  /** 최근 사건·밈 이름 (같은 사건이면 같은 이름을 쓰게 프롬프트에 보여 준다) */
+  recentEvents(days: number, limit: number): { event: string; count: number; lastAt: string }[] {
+    const since = new Date(Date.now() - days * DAY).toISOString();
+    const rows = this.db
+      .prepare(`
+        SELECT c.event AS event, COUNT(*) AS n, MAX(c.published_at) AS last FROM clips c
+        JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
+        WHERE ${VISIBLE} AND c.event IS NOT NULL AND c.event != '' AND c.published_at >= ?
+        GROUP BY c.event ORDER BY n DESC, last DESC LIMIT ?
+      `)
+      .all(since, limit) as unknown as Array<{ event: string; n: number; last: string }>;
+    return rows.map((r) => ({ event: r.event, count: Number(r.n), lastAt: r.last }));
   }
 
   /** 분류 시도 실패 (응답에 빠짐 등) — 몇 번까지만 다시 */
@@ -473,6 +649,14 @@ export class ClipRepo {
     if (clip.topic) {
       ors.push(`lower(c.topic) = lower(?)`);
       params.push(clip.topic);
+    }
+    if (clip.event) {
+      ors.push(`c.event = ?`);
+      params.push(clip.event);
+    }
+    if (clip.sourceKey) {
+      ors.push(`c.source_key = ?`);
+      params.push(clip.sourceKey);
     }
     if (ors.length === 0) return [];
     return this.selectClips(`c.video_id != ? AND ${VISIBLE} AND (${ors.join(" OR ")})`, `ORDER BY c.published_at DESC LIMIT ?`, [

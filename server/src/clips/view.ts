@@ -28,7 +28,18 @@ export interface ClipOut {
   summary: string | null;
   /** 버모아 좋아요 수 */
   likes: number;
+  /** 대표 순간 (moments[0]) */
+  primaryMoment: ClipTagOut | null;
+  /** 사건·밈 이름 */
+  event: string | null;
+  /** 원본 방송 다시보기 */
+  source: { url: string; platform: "chzzk" | "soop" | "youtube" } | null;
+  /** 원본 방송 날짜 (KST YYYY-MM-DD) */
+  sourceDate: string | null;
 }
+
+const sourcePlatform = (key: string | null): "chzzk" | "soop" | "youtube" | null =>
+  key?.startsWith("chzzk:") ? "chzzk" : key?.startsWith("soop:") ? "soop" : key?.startsWith("youtube:") ? "youtube" : null;
 
 const tagOut = (id: string | null): ClipTagOut | null => {
   const t = id ? clipTagById(id) : undefined;
@@ -50,6 +61,13 @@ export function toClipOuts(store: SqliteStore, rows: ClipRow[]): ClipOut[] {
     topic: r.topic,
     summary: r.summary,
     likes: r.likes,
+    primaryMoment: tagOut(r.primaryMoment),
+    event: r.event,
+    source:
+      r.sourceUrl && sourcePlatform(r.sourceKey)
+        ? { url: r.sourceUrl, platform: sourcePlatform(r.sourceKey) as "chzzk" | "soop" | "youtube" }
+        : null,
+    sourceDate: r.sourceDate,
   }));
 }
 

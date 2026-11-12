@@ -5,7 +5,8 @@ import { getClip, getClipTags } from "@/lib/data";
 import { PlayVideo } from "@/components/player/play-video";
 import { RemoteImage } from "@/components/remote-image";
 import { ClipGrid, ClipNotice, ClipTagChip } from "@/components/clip-card";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatYmd } from "@/lib/format";
+import { PLATFORMS } from "@/types";
 import { ClipActions } from "@/components/clip-actions";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +96,21 @@ export default async function ClipPage({ params }: { params: Params }) {
         <Row label="어떤 순간">
           {c.moments.length ? c.moments.map((m) => <ClipTagChip key={m.id} tag={m} href={`/clips?tag=${m.id}`} />) : <span className="text-muted-2">-</span>}
         </Row>
+        {c.event ? (
+          <Row label="어떤 일">
+            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-accent">{c.event}</span>
+          </Row>
+        ) : null}
+        {c.source || c.sourceDate ? (
+          <Row label="원본 방송">
+            {c.sourceDate ? <span>{formatYmd(c.sourceDate)}</span> : null}
+            {c.source ? (
+              <a href={c.source.url} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                {PLATFORMS[c.source.platform].label} 다시보기 ↗
+              </a>
+            ) : null}
+          </Row>
+        ) : null}
       </section>
 
       {d.sameVtuber.length ? (

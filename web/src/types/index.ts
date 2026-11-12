@@ -300,6 +300,14 @@ export interface Clip {
   summary: string | null;
   /** 버모아 좋아요 수 */
   likes?: number;
+  /** 대표 순간 (moments[0]) */
+  primaryMoment?: ClipTag | null;
+  /** 사건·밈 이름 */
+  event?: string | null;
+  /** 원본 방송 다시보기 */
+  source?: { url: string; platform: Platform } | null;
+  /** 원본 방송 날짜 (KST YYYY-MM-DD) */
+  sourceDate?: string | null;
 }
 
 export interface ClipDetail {

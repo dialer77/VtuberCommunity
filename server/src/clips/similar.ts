@@ -27,9 +27,14 @@ function textOf(c: ClipRow): string {
 
 export function similarity(a: ClipRow, b: ClipRow, aGrams = bigrams(textOf(a))): number {
   let s = 0;
+  // 같은 원본 방송 · 같은 사건이 가장 강한 연결
+  if (a.sourceKey && a.sourceKey === b.sourceKey) s += 6;
+  if (a.event && a.event === b.event) s += 5;
   if (a.topic && b.topic && norm(a.topic) === norm(b.topic)) s += 3;
   if (a.category && a.category === b.category) s += 1;
-  s += 1.2 * a.moments.filter((m) => b.moments.includes(m)).length;
+  // 대표 순간이 같으면 결이 비슷하다. 웃음은 대부분 클립에 붙어 있어 거의 구별이 안 되므로 약하게
+  if (a.primaryMoment && a.primaryMoment === b.primaryMoment) s += a.primaryMoment === "funny" ? 0.3 : 1.5;
+  for (const m of a.moments) if (b.moments.includes(m)) s += m === "funny" ? 0.3 : 1.2;
   s += 4 * jaccard(aGrams, bigrams(textOf(b)));
   return s;
 }

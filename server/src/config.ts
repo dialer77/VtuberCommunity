@@ -52,6 +52,8 @@ export const config = {
   /** 분류 주기(분)·한 번에 분류할 클립 수 */
   clipsClassifyIntervalMin: Number(process.env.CLIPS_CLASSIFY_INTERVAL_MIN ?? 30),
   clipsClassifyBatch: Number(process.env.CLIPS_CLASSIFY_BATCH ?? 50),
+  /** 새 클립이 없을 때 예전 분류를 보강(대표 순간·주제 통일·사건)할 클립 수. 0 이면 보강 안 함 */
+  clipsEnrichBatch: Number(process.env.CLIPS_ENRICH_BATCH ?? 80),
 
   // ---- 이슈 자동 수집 (Claude Code 헤드리스 + 구독 인증) — docs/issue-collector.md
   /** 1 이면 주기적으로 이슈 수집 */
