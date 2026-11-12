@@ -9,6 +9,7 @@ import { formatDate, formatYmd } from "@/lib/format";
 import { PLATFORMS } from "@/types";
 import { ClipActions } from "@/components/clip-actions";
 import { RecBundles } from "@/components/rec-bundles";
+import { WatchedMark } from "@/components/watched-mark";
 
 export const dynamic = "force-dynamic";
 
@@ -47,10 +48,11 @@ export default async function ClipPage({ params }: { params: Params }) {
       </Link>
 
       <PlayVideo
-        video={{ id: c.videoId, title: c.title, channel: c.channelTitle }}
+        video={{ id: c.videoId, title: c.title, channel: c.channelTitle, clip: true }}
         className="group relative block w-full aspect-video overflow-hidden rounded-xl border border-border bg-black"
       >
         <RemoteImage src={c.thumbnailUrl} className="absolute inset-0 h-full w-full object-cover opacity-90 transition-opacity group-hover:opacity-100" />
+        <WatchedMark videoId={c.videoId} />
         <span className="absolute inset-0 flex items-center justify-center">
           <span className="flex h-16 w-16 items-center justify-center rounded-full bg-black/60 text-3xl text-white shadow-lg transition-transform group-hover:scale-110">
             ▶

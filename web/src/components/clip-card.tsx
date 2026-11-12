@@ -3,6 +3,7 @@ import type { Clip, ClipTag } from "@/types";
 import { PlayVideo } from "@/components/player/play-video";
 import { RemoteImage } from "@/components/remote-image";
 import { formatDate } from "@/lib/format";
+import { WatchedMark } from "@/components/watched-mark";
 
 export function ClipTagChip({ tag, href, count }: { tag: ClipTag; href?: string; count?: number }) {
   const cls = "inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] text-accent";
@@ -22,17 +23,21 @@ export function ClipTagChip({ tag, href, count }: { tag: ClipTag; href?: string;
   );
 }
 
-/** 키리누키 카드 — 썸네일은 사이트 안에서 재생, 제목은 클립 페이지(분류·비슷한 클립)로 */
-export function ClipCard({ clip }: { clip: Clip }) {
+/**
+ * 키리누키 카드 — 썸네일은 사이트 안에서 재생(끝나면 비슷한 클립 이어보기), 제목은 클립 페이지(분류·추천)로.
+ * reason: 추천으로 나온 카드면 그 이유 (플레이어에 표시)
+ */
+export function ClipCard({ clip, reason }: { clip: Clip; reason?: string }) {
   const who = clip.vtubers.map((v) => v.name).join(", ");
   const tags = [clip.category, ...clip.moments].filter((t): t is ClipTag => !!t && t.id !== "etc").slice(0, 3);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <PlayVideo
-        video={{ id: clip.videoId, title: clip.title, channel: clip.channelTitle }}
+        video={{ id: clip.videoId, title: clip.title, channel: clip.channelTitle, clip: true, reason: reason ?? null }}
         className="group relative block aspect-video overflow-hidden rounded-lg bg-surface-2"
       >
         <RemoteImage src={clip.thumbnailUrl} className="absolute inset-0 h-full w-full object-cover transition-transform group-hover:scale-[1.03]" />
+        <WatchedMark videoId={clip.videoId} />
         <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-black/60 text-lg text-white">▶</span>
         </span>

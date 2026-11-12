@@ -14,7 +14,7 @@ import { curatedProfile } from "./profiles";
 import { searchChannels } from "./search";
 import { youtubeForProfile, youtubeLiveItems } from "./youtube/view";
 import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
-import { BUNDLE_IDS } from "./clips/recommend";
+import { BUNDLE_IDS, upNextFor } from "./clips/recommend";
 import { MOMENT_IDS } from "./clips/vocab";
 import {
   MAX_TITLE,
@@ -166,6 +166,25 @@ export function buildApi(store: SqliteStore) {
       limit: Number(q.limit) || 30,
       offset: Number(q.offset) || 0,
     });
+  });
+
+  // 이어보기 후보 — 플레이어가 클립이 끝나면 이 중 안 본 첫 클립을 재생 (본 기록은 브라우저에만 있음)
+  app.get("/api/clips/:videoId/next", async (req, reply) => {
+    const { videoId } = req.params as { videoId: string };
+    const row = /^[\w-]{11}$/.test(videoId) ? store.clips.getClip(videoId) : null;
+    if (!row) {
+      reply.code(404);
+      return { items: [] };
+    }
+    return {
+      items: upNextFor(store, row, 30).map((i) => ({
+        videoId: i.row.videoId,
+        title: i.row.title,
+        channelTitle: i.row.channelTitle,
+        reason: i.reason,
+        bundle: i.bundle,
+      })),
+    };
   });
 
   // 추천 묶음 측정 — 익명 합계만 (날짜·묶음별 노출·열기·재생 수). 사용자·IP 는 남기지 않는다

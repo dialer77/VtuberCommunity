@@ -2,7 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { ClipCard } from "@/components/clip-card";
+import { useWatched } from "@/lib/watched";
 import type { RecBundle } from "@/types";
+
+/** 묶음마다 보여 줄 카드 수 (서버는 여유분까지 보내고, 여기서 안 본 클립을 앞으로 보낸 뒤 자른다) */
+const SHOW = 8;
 
 type RecEvent = { b: string; t: "impression" | "open" | "play" };
 
@@ -49,6 +53,10 @@ export function RecBundles({ bundles }: { bundles: RecBundle[] }) {
 
 function Bundle({ bundle }: { bundle: RecBundle }) {
   const ref = useRef<HTMLElement>(null);
+  const watched = useWatched();
+  // 안 본 클립 먼저 (서버 순서는 유지), 본 클립은 뒤로
+  const items = [...bundle.items.filter((i) => !watched.has(i.clip.videoId)), ...bundle.items.filter((i) => watched.has(i.clip.videoId))].slice(0, SHOW);
+  const fresh = items.filter((i) => !watched.has(i.clip.videoId)).length;
 
   // 묶음이 화면에 40% 이상 보이면 노출 1회
   useEffect(() => {
@@ -77,14 +85,17 @@ function Bundle({ bundle }: { bundle: RecBundle }) {
         else if (target.closest('a[href^="/clips/"]')) track({ b: bundle.id, t: "open" });
       }}
     >
-      <h2 className="text-sm font-bold text-muted">{bundle.title}</h2>
+      <h2 className="text-sm font-bold text-muted">
+        {bundle.title}
+        {fresh < items.length ? <span className="ml-2 font-normal text-muted-2">안 본 클립 {fresh}개</span> : null}
+      </h2>
       <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3">
-        {bundle.items.map((i) => (
+        {items.map((i) => (
           <div key={i.clip.videoId} className="flex min-w-0 flex-col gap-1.5">
             <span className="w-fit max-w-full truncate rounded-md bg-surface-2 px-1.5 py-0.5 text-[11px] font-medium text-muted">
               {i.reason}
             </span>
-            <ClipCard clip={i.clip} />
+            <ClipCard clip={i.clip} reason={i.reason} />
           </div>
         ))}
       </div>

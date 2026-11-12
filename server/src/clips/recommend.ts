@@ -28,7 +28,8 @@ export interface RecBundle {
   items: RecItem[];
 }
 
-const PER_BUNDLE = 8;
+/** 묶음당 최대 개수 — 화면은 8개를 보여 주고, 나머지는 이미 본 클립을 뒤로 보낼 때 채우는 여유분 */
+const PER_BUNDLE = 12;
 const DAY = 86_400_000;
 
 const sameVt = (a: { platform: Platform; channelId: string }, b: { platform: Platform; channelId: string }) =>
@@ -172,6 +173,24 @@ export function recommendFor(store: SqliteStore, clip: ClipRow): RecBundle[] {
   }
 
   return bundles;
+}
+
+/**
+ * 이어보기 후보 (플레이어가 클립이 끝나면 이 순서로 안 본 클립을 고른다):
+ * 같은 방송(이 클립 다음에 올라온 장면 먼저) → 같은 사건 → 같은 버튜버 → 다른 버튜버 → 자주 함께
+ */
+export function upNextFor(store: SqliteStore, clip: ClipRow, limit = 30): (RecItem & { bundle: BundleId })[] {
+  const out: (RecItem & { bundle: BundleId })[] = [];
+  for (const b of recommendFor(store, clip)) {
+    let items = b.items;
+    if (b.id === "same_source") {
+      const after = items.filter((i) => i.row.publishedAt > clip.publishedAt);
+      const before = items.filter((i) => i.row.publishedAt <= clip.publishedAt);
+      items = [...after, ...before];
+    }
+    for (const i of items) out.push({ ...i, bundle: b.id });
+  }
+  return out.slice(0, limit);
 }
 
 /** 프로필용: 클립에 자주 같이 나오는 버튜버 (2번 이상) */
