@@ -310,8 +310,18 @@ export interface Clip {
   sourceDate?: string | null;
 }
 
+/** 추천 묶음 — 같은 방송·같은 사건·같은 버튜버·다른 버튜버·자주 함께 */
+export interface RecBundle {
+  id: "same_source" | "same_event" | "same_vtuber" | "same_scene" | "co_star";
+  title: string;
+  /** reason: 카드에 붙는 추천 이유 */
+  items: { clip: Clip; reason: string }[];
+}
+
 export interface ClipDetail {
   clip: Clip;
+  /** 추천 묶음 (없으면 sameVtuber·otherVtuber 로 표시) */
+  bundles?: RecBundle[];
   sameVtuber: Clip[];
   otherVtuber: Clip[];
   /** '어떤 순간' 태그 투표 현황 */
@@ -352,6 +362,8 @@ export interface ProfileClips {
   traits: (ClipTag & { count: number })[];
   /** 자주 하는 것 (게임 이름 등) */
   topics: { topic: string; count: number }[];
+  /** 클립에 자주 같이 나오는 버튜버 */
+  coStars?: { platform: Platform; channelId: string; name: string; count: number }[];
 }
 
 /** 버튜버 검색 결과 하나 (방송 중이 아니어도 수집 DB 에 있으면 나온다) */

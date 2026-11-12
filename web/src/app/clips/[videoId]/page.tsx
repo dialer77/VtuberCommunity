@@ -8,6 +8,7 @@ import { ClipGrid, ClipNotice, ClipTagChip } from "@/components/clip-card";
 import { formatDate, formatYmd } from "@/lib/format";
 import { PLATFORMS } from "@/types";
 import { ClipActions } from "@/components/clip-actions";
+import { RecBundles } from "@/components/rec-bundles";
 
 export const dynamic = "force-dynamic";
 
@@ -113,7 +114,11 @@ export default async function ClipPage({ params }: { params: Params }) {
         ) : null}
       </section>
 
-      {d.sameVtuber.length ? (
+      {d.bundles ? (
+        <RecBundles bundles={d.bundles} />
+      ) : null}
+
+      {!d.bundles && d.sameVtuber.length ? (
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-bold text-muted">
             {c.vtubers[0] ? `${c.vtubers[0].name}의 비슷한 클립` : "같은 버튜버의 비슷한 클립"}
@@ -122,7 +127,7 @@ export default async function ClipPage({ params }: { params: Params }) {
         </section>
       ) : null}
 
-      {d.otherVtuber.length ? (
+      {!d.bundles && d.otherVtuber.length ? (
         <section className="flex flex-col gap-3">
           <h2 className="text-sm font-bold text-muted">다른 버튜버의 비슷한 클립</h2>
           <ClipGrid clips={d.otherVtuber} narrow />

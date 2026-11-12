@@ -228,6 +228,22 @@ export default async function VtuberProfilePage({
               ) : null}
             </div>
           ) : null}
+          {clips.coStars?.length ? (
+            <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4">
+              <p className="text-xs font-bold text-muted">클립에 자주 함께 나오는 버튜버</p>
+              <div className="flex flex-wrap gap-1.5">
+                {clips.coStars.map((v) => (
+                  <Link
+                    key={`${v.platform}:${v.channelId}`}
+                    href={`/vtuber/${v.platform}/${v.channelId}?tab=clips`}
+                    className="rounded-full border border-border px-2.5 py-0.5 text-[13px] text-muted hover:border-accent/50 hover:text-foreground transition-colors"
+                  >
+                    {v.name} <span className="text-muted-2 tabular-nums">{v.count}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <ClipGrid clips={clips.clips} narrow />
           {clips.total > clips.clips.length ? (
             <Link href={`/clips?v=${p.platform}:${p.channelId}`} className="w-fit text-sm text-accent hover:underline">

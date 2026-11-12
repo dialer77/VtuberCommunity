@@ -13,6 +13,7 @@
     powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 topics [개수]           # 많이 쓰인 주제 이름 (같은 게임이 다른 이름으로 갈렸는지)
     powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 alias 마크 마인크래프트   # 주제 이름 통일 (기존 클립에도 반영)
     powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 events [일수]           # 최근 사건·밈 이름과 클립 수
+    powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 recstats [일수]         # 추천 묶음별 노출·열기·재생·클릭률 (익명 합계)
 #>
 param(
   [Parameter(Position = 0)][string]$Command = 'status',

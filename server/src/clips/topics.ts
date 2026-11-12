@@ -50,6 +50,15 @@ export const SEED_TOPIC_ALIASES: Record<string, string> = {
   justchatting: "저스트 채팅",
 };
 
+// 너무 일반적인 주제 — 같아도 "같은 게임·콘텐츠"라고 하기 어렵다 (추천 근거로 약하게만 쓴다)
+const GENERIC = new Set(
+  ["저스트 채팅", "저챗", "잡담", "토크", "노래 방송", "노래", "합방", "방송", "게임", "시청자 사연", "리액션", "먹방", "그림", "ASMR", "종합게임", "기타"].map(topicKey),
+);
+
+export function isGenericTopic(topic: string | null): boolean {
+  return !topic || GENERIC.has(topicKey(topic));
+}
+
 /** 주제 → 정식 이름 (별칭 사전 우선, 없으면 그대로) */
 export function canonicalTopic(raw: string | null, aliases: Map<string, string>): string | null {
   const t = (raw ?? "").replace(/\s+/g, " ").trim();

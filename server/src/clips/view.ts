@@ -4,7 +4,7 @@ import type { Platform } from "../domain";
 import type { ClipRow } from "./store";
 import { CLIP_TAGS, MOMENT_IDS, clipTagById, type ClipTagDef } from "./vocab";
 import { VOTE_MARGIN } from "./store";
-import { findSimilar } from "./similar";
+import { coStarsFor, recommendFor, type BundleId } from "./recommend";
 import { ytChannelUrl, ytThumb } from "../youtube/view";
 
 export interface ClipTagOut {
@@ -77,16 +77,32 @@ export function clipTagsWithCounts(store: SqliteStore): (ClipTagOut & { count: n
   return CLIP_TAGS.map((t) => ({ id: t.id, label: t.label, emoji: t.emoji, kind: t.kind, count: counts.get(t.id) ?? 0 }));
 }
 
-/** 클립 상세 + 비슷한 클립 */
+export interface RecBundleOut {
+  id: BundleId;
+  title: string;
+  items: { clip: ClipOut; reason: string }[];
+}
+
+/** 클립 상세 + 추천 묶음 (recommend.ts) */
 export function clipDetail(store: SqliteStore, videoId: string) {
   const row = store.clips.getClip(videoId);
   if (!row) return null;
-  const { same, other } = findSimilar(store.clips, row);
-  const [clip, ...rest] = toClipOuts(store, [row, ...same, ...other]);
+  const recs = recommendFor(store, row);
+  const flat = recs.flatMap((b) => b.items.map((i) => i.row));
+  const [clip, ...outs] = toClipOuts(store, [row, ...flat]);
+  let k = 0;
+  const bundles: RecBundleOut[] = recs.map((b) => ({
+    id: b.id,
+    title: b.title,
+    items: b.items.map((i) => ({ clip: outs[k++]!, reason: i.reason })),
+  }));
+  const of = (id: BundleId) => bundles.find((b) => b.id === id)?.items.map((i) => i.clip) ?? [];
   return {
     clip: clip!,
-    sameVtuber: rest.slice(0, same.length),
-    otherVtuber: rest.slice(same.length),
+    bundles,
+    // 예전 화면 호환
+    sameVtuber: of("same_vtuber"),
+    otherVtuber: of("same_scene"),
     tagVotes: clipTagVotes(store, videoId),
     voteMargin: VOTE_MARGIN,
   };
@@ -107,6 +123,8 @@ export function clipsForProfile(store: SqliteStore, platform: Platform, channelI
     clips: toClipOuts(store, clips),
     traits,
     topics: store.clips.topTopics(vtuber, 5).filter((t) => t.count >= 2),
+    /** 클립에 자주 같이 나오는 버튜버 */
+    coStars: coStarsFor(store, vtuber, 8),
   };
 }
 

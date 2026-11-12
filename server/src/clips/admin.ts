@@ -11,6 +11,7 @@
 //   topics [개수]             많이 쓰인 주제 이름 (같은 게임이 다른 이름으로 갈렸는지 보기)
 //   alias <별칭> <정식 이름>   주제 이름 통일 — 기존 클립에도 바로 반영 (예: alias 마크 마인크래프트)
 //   events [일수]             최근 사건·밈 이름과 클립 수
+//   recstats [일수]           추천 묶음별 노출·열기·재생·클릭률 (익명 합계)
 // <채널>: UC… 채널 ID 또는 채널 이름
 import { SqliteStore } from "../store/sqlite";
 import { config } from "../config";
@@ -170,12 +171,28 @@ switch (cmd) {
     console.log(`'${arg1}' → '${arg2}' 등록 · 기존 클립 ${n}개 주제를 바꿨어요`);
     break;
   }
+  case "recstats": {
+    const days = Number(arg1) || 7;
+    const LABEL: Record<string, string> = {
+      same_source: "같은 방송",
+      same_event: "같은 사건",
+      same_vtuber: "같은 버튜버",
+      same_scene: "다른 버튜버",
+      co_star: "자주 함께",
+    };
+    console.log(`최근 ${days}일 추천 묶음 (노출 = 화면에 보인 횟수, 클릭률 = (열기+재생)/노출)`);
+    for (const r of repo.recStats(days)) {
+      const ctr = r.impressions ? (((r.opens + r.plays) / r.impressions) * 100).toFixed(1) : "-";
+      console.log(`  ${(LABEL[r.bundle] ?? r.bundle).padEnd(8)} 노출 ${String(r.impressions).padStart(6)} · 열기 ${String(r.opens).padStart(5)} · 재생 ${String(r.plays).padStart(5)} · 클릭률 ${ctr}%`);
+    }
+    break;
+  }
   case "events": {
     for (const e of repo.recentEvents(Number(arg1) || 30, 100)) console.log(`${String(e.count).padStart(4)}  ${e.lastAt.slice(0, 10)}  ${e.event}`);
     break;
   }
   default:
     console.log(
-      "사용법: status | channels [상태] [개수] | block <채널> | unblock <채널> | add <주소> [버튜버] | discover [개수] | classify | enrich | recent [개수] | topics [개수] | alias <별칭> <정식 이름> | events [일수]",
+      "사용법: status | channels [상태] [개수] | block <채널> | unblock <채널> | add <주소> [버튜버] | discover [개수] | classify | enrich | recent [개수] | topics [개수] | alias <별칭> <정식 이름> | events [일수] | recstats [일수]",
     );
 }

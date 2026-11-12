@@ -14,6 +14,7 @@ import { curatedProfile } from "./profiles";
 import { searchChannels } from "./search";
 import { youtubeForProfile, youtubeLiveItems } from "./youtube/view";
 import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
+import { BUNDLE_IDS } from "./clips/recommend";
 import { MOMENT_IDS } from "./clips/vocab";
 import {
   MAX_TITLE,
@@ -165,6 +166,24 @@ export function buildApi(store: SqliteStore) {
       limit: Number(q.limit) || 30,
       offset: Number(q.offset) || 0,
     });
+  });
+
+  // 추천 묶음 측정 — 익명 합계만 (날짜·묶음별 노출·열기·재생 수). 사용자·IP 는 남기지 않는다
+  app.post("/api/rec/events", async (req, reply) => {
+    const body = req.body as { events?: unknown };
+    const list = Array.isArray(body?.events) ? body.events.slice(0, 30) : [];
+    const counts = new Map<string, { impressions: number; opens: number; plays: number }>();
+    for (const e of list as { b?: unknown; t?: unknown }[]) {
+      const b = typeof e?.b === "string" && (BUNDLE_IDS as readonly string[]).includes(e.b) ? e.b : null;
+      const t = e?.t === "impression" ? "impressions" : e?.t === "open" ? "opens" : e?.t === "play" ? "plays" : null;
+      if (!b || !t) continue;
+      const c = counts.get(b) ?? { impressions: 0, opens: 0, plays: 0 };
+      c[t] += 1;
+      counts.set(b, c);
+    }
+    if (counts.size) store.clips.addRecStats(counts);
+    reply.code(204);
+    return null;
   });
 
   // 사이트맵 재료 — 검색 노출 대상 프로필(방송 3회 이상 또는 최근 90일 방송) + 보이는 클립

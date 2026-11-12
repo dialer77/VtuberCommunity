@@ -210,6 +210,15 @@ export class ClipRepo {
         source     TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
+      -- 추천 묶음 측정 (익명 합계만: 날짜·묶음별 노출·열기·재생 수)
+      CREATE TABLE IF NOT EXISTS rec_stats (
+        date        TEXT NOT NULL,
+        bundle      TEXT NOT NULL,
+        impressions INTEGER NOT NULL DEFAULT 0,
+        opens       INTEGER NOT NULL DEFAULT 0,
+        plays       INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (date, bundle)
+      );
     `);
   }
 
@@ -599,6 +608,105 @@ export class ClipRepo {
       `)
       .all(since, limit) as unknown as Array<{ event: string; n: number; last: string }>;
     return rows.map((r) => ({ event: r.event, count: Number(r.n), lastAt: r.last }));
+  }
+
+  // ---------------------------------------------------------------- 추천 후보 (recommend.ts)
+
+  /** 같은 원본 방송: 원본 링크가 같거나, 같은 버튜버의 같은 날 방송 (방송 순서대로) */
+  sameSourceClips(clip: ClipRow, limit: number): ClipRow[] {
+    const ors: string[] = [];
+    const params: unknown[] = [clip.videoId];
+    if (clip.sourceKey) {
+      ors.push(`c.source_key = ?`);
+      params.push(clip.sourceKey);
+    }
+    const main = clip.vtubers[0];
+    if (clip.sourceDate && main) {
+      ors.push(
+        `(c.source_date = ? AND EXISTS (SELECT 1 FROM clip_vtubers v WHERE v.video_id = c.video_id AND v.platform = ? AND v.channel_id = ?))`,
+      );
+      params.push(clip.sourceDate, main.platform, main.channelId);
+    }
+    if (ors.length === 0) return [];
+    return this.selectClips(`c.video_id != ? AND ${VISIBLE} AND (${ors.join(" OR ")})`, `ORDER BY c.published_at ASC LIMIT ?`, [
+      ...params,
+      limit,
+    ]);
+  }
+
+  /** 같은 사건·밈 (올라온 순서대로) */
+  eventClips(event: string, excludeId: string, limit: number): ClipRow[] {
+    return this.selectClips(`c.video_id != ? AND ${VISIBLE} AND c.event = ?`, `ORDER BY c.published_at ASC LIMIT ?`, [excludeId, event, limit]);
+  }
+
+  /** 이 버튜버들이 나오는 최근 클립 */
+  vtuberClips(vt: { platform: Platform; channelId: string }[], excludeId: string, limit: number): ClipRow[] {
+    if (vt.length === 0) return [];
+    const cond = vt.map(() => "(v.platform = ? AND v.channel_id = ?)").join(" OR ");
+    return this.selectClips(
+      `c.video_id != ? AND ${VISIBLE} AND EXISTS (SELECT 1 FROM clip_vtubers v WHERE v.video_id = c.video_id AND (${cond}))`,
+      `ORDER BY c.published_at DESC LIMIT ?`,
+      [excludeId, ...vt.flatMap((v) => [v.platform, v.channelId]), limit],
+    );
+  }
+
+  /** 같은 주제(게임·콘텐츠)의 최근 클립 */
+  topicClips(topic: string, excludeId: string, limit: number): ClipRow[] {
+    return this.selectClips(`c.video_id != ? AND ${VISIBLE} AND lower(c.topic) = lower(?)`, `ORDER BY c.published_at DESC LIMIT ?`, [
+      excludeId,
+      topic,
+      limit,
+    ]);
+  }
+
+  /** 대표 순간이 같은 최근 클립 */
+  primaryMomentClips(moment: string, excludeId: string, limit: number): ClipRow[] {
+    return this.selectClips(`c.video_id != ? AND ${VISIBLE} AND c.primary_moment = ?`, `ORDER BY c.published_at DESC LIMIT ?`, [
+      excludeId,
+      moment,
+      limit,
+    ]);
+  }
+
+  /** 이 버튜버와 클립에 자주 같이 나오는 버튜버 (같이 나온 클립 수) */
+  coStars(vtuber: { platform: Platform; channelId: string }, limit: number): { platform: Platform; channelId: string; count: number }[] {
+    const rows = this.db
+      .prepare(`
+        SELECT v2.platform AS platform, v2.channel_id AS channel_id, COUNT(*) AS n
+        FROM clip_vtubers v1
+        JOIN clip_vtubers v2 ON v2.video_id = v1.video_id AND NOT (v2.platform = v1.platform AND v2.channel_id = v1.channel_id)
+        JOIN clips c ON c.video_id = v1.video_id
+        JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
+        WHERE v1.platform = ? AND v1.channel_id = ? AND ${VISIBLE}
+        GROUP BY v2.platform, v2.channel_id ORDER BY n DESC LIMIT ?
+      `)
+      .all(vtuber.platform, vtuber.channelId, limit) as unknown as Array<{ platform: Platform; channel_id: string; n: number }>;
+    return rows.map((r) => ({ platform: r.platform, channelId: r.channel_id, count: Number(r.n) }));
+  }
+
+  // ---------------------------------------------------------------- 추천 측정
+
+  /** 묶음별 노출·열기·재생 더하기 (오늘 KST 날짜) */
+  addRecStats(counts: Map<string, { impressions: number; opens: number; plays: number }>): void {
+    const date = new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+    const st = this.db.prepare(`
+      INSERT INTO rec_stats (date, bundle, impressions, opens, plays) VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(date, bundle) DO UPDATE SET
+        impressions = impressions + excluded.impressions, opens = opens + excluded.opens, plays = plays + excluded.plays
+    `);
+    for (const [bundle, c] of counts) st.run(date, bundle, c.impressions, c.opens, c.plays);
+  }
+
+  /** 최근 N일 묶음별 합계 */
+  recStats(days: number): { bundle: string; impressions: number; opens: number; plays: number }[] {
+    const since = new Date(Date.now() + 9 * 3_600_000 - (days - 1) * DAY).toISOString().slice(0, 10);
+    const rows = this.db
+      .prepare(`
+        SELECT bundle, SUM(impressions) AS i, SUM(opens) AS o, SUM(plays) AS p FROM rec_stats
+        WHERE date >= ? GROUP BY bundle ORDER BY i DESC
+      `)
+      .all(since) as unknown as Array<{ bundle: string; i: number; o: number; p: number }>;
+    return rows.map((r) => ({ bundle: r.bundle, impressions: Number(r.i), opens: Number(r.o), plays: Number(r.p) }));
   }
 
   /** 분류 시도 실패 (응답에 빠짐 등) — 몇 번까지만 다시 */
