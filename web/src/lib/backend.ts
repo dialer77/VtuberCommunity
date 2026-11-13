@@ -20,6 +20,7 @@ import type {
   ClipDetail,
   ClipTagCount,
   SearchResponse,
+  Song,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -285,6 +286,29 @@ export async function fetchSitemapEntries(): Promise<{
   if (!res.ok) throw new Error(`backend /api/sitemap ${res.status}`);
   const json = (await res.json()) as { channels?: []; clips?: [] };
   return { channels: json.channels ?? [], clips: json.clips ?? [] };
+}
+
+/** 공식 채널 노래 (커버·오리지널, 올린 날짜순) */
+export async function fetchSongs(q: {
+  kind?: "cover" | "original";
+  q?: string;
+  vtuber?: { platform: string; channelId: string };
+  limit?: number;
+  offset?: number;
+}): Promise<{ total: number; songs: Song[] }> {
+  const sp = new URLSearchParams();
+  if (q.kind) sp.set("kind", q.kind);
+  if (q.q) sp.set("q", q.q);
+  if (q.vtuber) {
+    sp.set("platform", q.vtuber.platform);
+    sp.set("channelId", q.vtuber.channelId);
+  }
+  sp.set("limit", String(q.limit ?? 24));
+  sp.set("offset", String(q.offset ?? 0));
+  const res = await fetch(`${BASE}/api/songs?${sp}`, fetchInit());
+  if (!res.ok) throw new Error(`backend /api/songs ${res.status}`);
+  const json = (await res.json()) as { total?: number; songs?: Song[] };
+  return { total: json.total ?? 0, songs: json.songs ?? [] };
 }
 
 /** 버튜버 검색 — 이름·초성·'#태그', tags 는 모두 만족 */

@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/", label: "LIVE" },
   { href: "/ranking", label: "랭킹" },
   { href: "/clips", label: "클립" },
+  { href: "/songs", label: "노래" },
   { href: "/debut", label: "신규 데뷔" },
   { href: "/issue", label: "이슈" },
 ];

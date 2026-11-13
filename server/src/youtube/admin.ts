@@ -7,17 +7,25 @@
 //   none <대상>                 공식 채널 없음 (자동 연결 안 함)
 //   auto <대상>                 확정 해제 → 다음 확인 때 다시 자동 추정
 //   run [개수]                  지금 바로 매핑 (기본 30개)
+//   vtubers [all|queue]         유튜브 전용 버튜버 (all = 제외·연결된 것 포함, queue = 확인 대기열)
+//   vtuber-add <주소> <이름> [소속] [ko|foreign]   유튜브 전용 버튜버 추가 (운영자 확인 상태)
+//   vtuber-ok <UC…|이름>        확인 (자동 수집이 덮어쓰지 않음)
+//   vtuber-block <UC…|이름>     제외 (버튜버가 아님·잘못 찾음 — 다시 수집돼도 안 보임)
+//   vtuber-name <UC…|이름> <새 이름>   이름 바꾸기 (예전 이름은 별칭으로)
+//   vtuber-discover             지금 바로 웹 수집 (Claude, 몇 분 걸림) + 확인
+//   songs [개수]                노래(커버·오리지널) 수집 상태 + 최근 노래
 // <대상>: chzzk:<채널ID> · soop:<아이디> · 버튜버 이름 (공백이 있으면 따옴표)
 import { SqliteStore } from "../store/sqlite";
 import { config } from "../config";
 import type { Platform } from "../domain";
-import type { YtLink } from "./store";
+import type { YtLink, YtVtuber } from "./store";
 import { mappingTargets, runMapping, type MapTarget } from "./sync";
 import { parseYoutubeChannelUrl } from "./links";
 import { channelByHandle, quotaUsedToday, ytApiEnabled } from "./api";
 import { fetchFeed } from "./rss";
+import { discoverYoutubeVtubers, queueYoutubeVtuber, relinkYoutubeVtuberClips, resolveQueue } from "./vtubers";
 
-const [cmd = "status", arg1, arg2] = process.argv.slice(2);
+const [cmd = "status", arg1, arg2, arg3, arg4] = process.argv.slice(2);
 const store = new SqliteStore(config.dbPath);
 const repo = store.youtube;
 
@@ -69,6 +77,33 @@ function resolveTarget(raw: string | undefined): MapTarget {
   return [...all.values()][0]!;
 }
 
+/** 유튜브 전용 버튜버 찾기: UC… 또는 이름·별칭 */
+function resolveVtuber(raw: string | undefined): YtVtuber {
+  if (!raw) die("대상을 적어 주세요 (UC… 또는 이름)");
+  const key = raw.trim();
+  const all = repo.listVtubers({ all: true });
+  const hit = all.filter((v) => v.ytChannelId === key || v.name === key || v.aliases.includes(key));
+  if (hit.length === 0) die(`'${key}' 유튜브 전용 버튜버를 찾지 못했어요 (vtubers all 로 목록 확인)`);
+  if (hit.length > 1) {
+    console.error(`'${key}' 가 여럿이에요. UC… 로 적어 주세요:`);
+    for (const v of hit) console.error(`  ${v.ytChannelId}   ${v.name}`);
+    process.exit(1);
+  }
+  return hit[0]!;
+}
+
+const VT_STATUS: Record<YtVtuber["status"], string> = { auto: "자동", manual: "확인", blocked: "제외" };
+
+function vtuberLine(v: YtVtuber): string {
+  const ch = repo.getChannel(v.ytChannelId);
+  const extra = [v.group, v.region === "foreign" ? "해외" : null, v.aliases.length ? `별칭 ${v.aliases.join("·")}` : null]
+    .filter(Boolean)
+    .join(" · ");
+  const songs = repo.songCounts(v.ytChannelId);
+  return `[${VT_STATUS[v.status]}${v.active ? "" : v.status === "blocked" ? "" : " · 치지직/SOOP 공식 채널로 연결됨"}] ${v.name}${extra ? ` (${extra})` : ""}
+       https://www.youtube.com/channel/${v.ytChannelId}  ${ch?.title ?? ""} · 출처 ${v.source} · 노래 ${songs.cover + songs.original}`;
+}
+
 function linkLine(l: YtLink | null, t: MapTarget, rank?: number): string {
   const head = `${rank != null ? `${String(rank).padStart(3)}. ` : ""}${t.name}  (${t.platform}:${t.channelId})`;
   if (!l) return `${head}\n       → 아직 확인 안 함`;
@@ -105,6 +140,9 @@ switch (cmd) {
           links: repo.statusCounts(),
           youtubeChannels: repo.mappedYtChannels().length,
           liveNow: repo.listLiveVideos(10 * 60_000).length,
+          ytOnlyVtubers: repo.listVtubers().length,
+          ytOnlyQueue: repo.listQueue(1000).length,
+          songs: repo.songStatus(),
         },
         null,
         2,
@@ -185,8 +223,77 @@ switch (cmd) {
     console.log(JSON.stringify({ ...r, links: repo.statusCounts() }, null, 2));
     break;
   }
+  case "vtubers": {
+    if (arg1 === "queue") {
+      const q = repo.listQueue(500);
+      if (q.length === 0) console.log("(확인 대기 없음)");
+      for (const x of q) console.log(`${x.ref}  ${x.name}${x.group ? ` (${x.group})` : ""} · 출처 ${x.source}${x.tries ? ` · 실패 ${x.tries}회 ${x.lastError ?? ""}` : ""}`);
+      break;
+    }
+    const list = repo.listVtubers({ all: arg1 === "all" });
+    if (list.length === 0) console.log("(없음)");
+    list.forEach((v, i) => console.log(`${String(i + 1).padStart(3)}. ${vtuberLine(v)}`));
+    break;
+  }
+  case "vtuber-add": {
+    if (!arg1 || !arg2) die("사용법: vtuber-add <유튜브 채널 주소> <이름> [소속] [ko|foreign]");
+    const region = arg4 === "foreign" || arg3 === "foreign" ? "foreign" : "ko";
+    const group = arg3 && arg3 !== "ko" && arg3 !== "foreign" ? arg3 : null;
+    const r = queueYoutubeVtuber(store, { url: arg1, name: arg2, group, region, source: "manual" });
+    if (r === "bad_url") die("유튜브 채널 주소가 아니에요 (youtube.com/@핸들 · youtube.com/channel/UC… · UC…)");
+    if (!ytApiEnabled()) {
+      console.log("확인 대기열에 넣었어요. API 키가 없어 채널 확인은 키를 등록한 뒤에 됩니다.");
+      break;
+    }
+    const s = await resolveQueue(store, 50);
+    for (const a of s.added) console.log(`추가: ${a}`);
+    for (const k of s.skipped) console.log(`넣지 않음: ${k.name} — ${k.reason}`);
+    const v = repo.listVtubers({ all: true }).find((x) => x.name === arg2);
+    if (v) {
+      repo.setVtuberStatus(v.ytChannelId, "manual", null);
+      console.log(vtuberLine(repo.getVtuber(v.ytChannelId)!));
+      await loadFeedNow(v.ytChannelId);
+    }
+    break;
+  }
+  case "vtuber-ok":
+  case "vtuber-block": {
+    const v = resolveVtuber(arg1);
+    repo.setVtuberStatus(v.ytChannelId, cmd === "vtuber-ok" ? "manual" : "blocked", cmd === "vtuber-ok" ? null : "운영자 제외");
+    console.log(vtuberLine(repo.getVtuber(v.ytChannelId)!));
+    break;
+  }
+  case "vtuber-name": {
+    const v = resolveVtuber(arg1);
+    if (!arg2?.trim()) die("새 이름을 적어 주세요");
+    repo.saveVtuber({ ...v, name: arg2.trim(), aliases: [...v.aliases, v.name], status: v.status === "blocked" ? "blocked" : "manual", source: v.source });
+    console.log(vtuberLine(repo.getVtuber(v.ytChannelId)!));
+    relinkYoutubeVtuberClips(store);
+    break;
+  }
+  case "vtuber-discover": {
+    const d = await discoverYoutubeVtubers(store);
+    console.log(`웹 수집: 후보 ${d.found} · 확인 대기 +${d.queued.length}`);
+    for (const k of d.skipped) console.log(`  넣지 않음: ${k.name} — ${k.reason}`);
+    if (ytApiEnabled()) {
+      const s = await resolveQueue(store, 100);
+      for (const a of s.added) console.log(`추가: ${a}`);
+      for (const k of s.skipped) console.log(`넣지 않음: ${k.name} — ${k.reason}`);
+    }
+    break;
+  }
+  case "songs": {
+    console.log(JSON.stringify(repo.songStatus(), null, 2));
+    const owners = repo.ownerMap();
+    const { songs } = repo.listSongs({ limit: Number(arg1) || 20, offset: 0 });
+    for (const x of songs) {
+      console.log(`${x.publishedAt.slice(0, 10)} [${x.kind === "cover" ? "커버" : "오리지널"}] ${owners.get(x.ytChannelId)?.name ?? "?"} — ${x.title}`);
+    }
+    break;
+  }
   default:
     console.log(
-      "사용법: status | list [상태] [개수] | pending [개수] | show <대상> | set <대상> <유튜브 주소> | none <대상> | auto <대상> | run [개수]",
+      "사용법: status | list [상태] [개수] | pending [개수] | show <대상> | set <대상> <유튜브 주소> | none <대상> | auto <대상> | run [개수]\n" +
+        "        vtubers [all|queue] | vtuber-add <주소> <이름> [소속] [ko|foreign] | vtuber-ok <대상> | vtuber-block <대상> | vtuber-name <대상> <새 이름> | vtuber-discover | songs [개수]",
     );
 }

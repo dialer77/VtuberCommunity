@@ -249,3 +249,74 @@ export async function videoTitles(meta: MetaStore, ids: string[]): Promise<{ vid
   }
   return out;
 }
+
+// ---------------------------------------------------------------- 노래 (공식 채널 커버·오리지널)
+
+interface PlaylistItemsResponse {
+  nextPageToken?: string;
+  items?: { snippet?: { title?: string; publishedAt?: string; resourceId?: { videoId?: string } } }[];
+}
+
+/**
+ * 채널 업로드 목록 한 쪽 (playlistItems.list, 50개 1단위). 업로드 재생목록 ID 는 채널 ID 의 UC → UU.
+ * 업로드 목록이 없으면(404) items 없이 끝으로.
+ */
+export async function uploadsPage(
+  meta: MetaStore,
+  ytChannelId: string,
+  pageToken: string | null,
+): Promise<{ items: { videoId: string; title: string; publishedAt: string }[]; nextPageToken: string | null }> {
+  const params: Record<string, string> = { part: "snippet", playlistId: `UU${ytChannelId.slice(2)}`, maxResults: "50" };
+  if (pageToken) params.pageToken = pageToken;
+  let j: PlaylistItemsResponse;
+  try {
+    j = await call<PlaylistItemsResponse>(meta, "playlistItems", params, false);
+  } catch (e) {
+    if (e instanceof Error && / 404\b/.test(e.message)) return { items: [], nextPageToken: null };
+    throw e;
+  }
+  const items: { videoId: string; title: string; publishedAt: string }[] = [];
+  for (const it of j.items ?? []) {
+    const id = it.snippet?.resourceId?.videoId;
+    if (id && it.snippet?.title) items.push({ videoId: id, title: it.snippet.title, publishedAt: it.snippet.publishedAt ?? "" });
+  }
+  return { items, nextPageToken: j.nextPageToken ?? null };
+}
+
+interface SongVideosResponse {
+  items?: {
+    id: string;
+    snippet?: { title?: string; publishedAt?: string; liveBroadcastContent?: string };
+    contentDetails?: { duration?: string };
+  }[];
+}
+
+export interface SongVideoInfo {
+  videoId: string;
+  title: string;
+  publishedAt: string | null;
+  durationSec: number | null;
+  /** 아직 공개 전·방송 중(예정 프리미어 등) */
+  liveNow: boolean;
+}
+
+/** 노래 영상 확인: 제목·길이·공개 상태 (50개 1단위). 삭제·비공개는 응답에 없다 */
+export async function songVideos(meta: MetaStore, ids: string[]): Promise<SongVideoInfo[]> {
+  const out: SongVideoInfo[] = [];
+  for (let i = 0; i < ids.length; i += 50) {
+    const batch = ids.slice(i, i + 50);
+    const j = await call<SongVideosResponse>(meta, "videos", { part: "snippet,contentDetails", id: batch.join(","), maxResults: "50" }, false);
+    for (const it of j.items ?? []) {
+      const dur = parseDuration(it.contentDetails?.duration);
+      const lb = it.snippet?.liveBroadcastContent;
+      out.push({
+        videoId: it.id,
+        title: it.snippet?.title ?? "",
+        publishedAt: it.snippet?.publishedAt ?? null,
+        durationSec: dur && dur > 0 ? dur : null,
+        liveNow: lb === "live" || lb === "upcoming",
+      });
+    }
+  }
+  return out;
+}

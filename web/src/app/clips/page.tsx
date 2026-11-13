@@ -13,9 +13,9 @@ const PAGE_SIZE = 24;
 
 type Search = Promise<{ tag?: string; v?: string; page?: string; sort?: string; q?: string }>;
 
-/** ?v=chzzk:<채널ID> → 버튜버 필터 */
+/** ?v=chzzk:<채널ID> · youtube:UC… → 버튜버 필터 */
 function parseVtuber(v: string | undefined): { platform: string; channelId: string } | undefined {
-  const m = v ? /^(chzzk|soop):([\w-]{1,64})$/.exec(v) : null;
+  const m = v ? /^(chzzk|soop|youtube):([\w-]{1,64})$/.exec(v) : null;
   return m ? { platform: m[1]!, channelId: m[2]! } : undefined;
 }
 

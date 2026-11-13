@@ -116,6 +116,49 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 events 14     
 
 분류 2판(2026-11-12): 대표 순간 1개 + 보조 순간, 주제 정식 이름(이미 쓰는 이름·별칭 사전), 사건·밈 이름, 원본 방송(설명의 치지직·SOOP 다시보기 링크·날짜). 분류 입력은 계속 RSS 제목·설명뿐이고, 기존 클립 보강은 RSS 로 만든 기존 분류(요약·주제)와 videos.list 로 바뀐 적 없는 제목만 쓴다.
 
+## 5. 유튜브 전용 버튜버 (2026-11-13)
+
+치지직·SOOP 채널 없이 유튜브에서만 활동하는 버튜버를 따로 목록으로 둡니다. 등록되면 검색, 프로필(`/vtuber/youtube/UC…`), 공식 영상, 노래, 키리누키 출연 연결, 유튜브 라이브 표시가 켜집니다.
+
+| 작업 | 주기 | 할당량 |
+| --- | --- | --- |
+| **웹 수집** — Claude(구독, 웹 검색)가 ① 유튜브가 주 무대인 한국 버튜버(버추얼 가수·아이돌 포함) ② 버모아 키리누키 제목에 나오는데 아직 모르는 버튜버(홀로라이브 등 해외 포함)의 공식 채널 주소를 찾음. 한 번에 최대 `YT_VTUBERS_MAX_PER_RUN`(40)명 | `YT_VTUBERS_DISCOVER_DAYS`(기본 7)일마다, Claude 작업 스케줄러에서 (3~6분) | 0 |
+| **데뷔 소식** — 데뷔 웹 수집에서 채널 주소가 유튜브면 후보로 | 데뷔 수집 때 | 0 |
+| **확인** — 후보 주소(@핸들·UC…)가 실제 채널인지 확인. 치지직·SOOP 버튜버의 공식 채널로 이미 연결된 채널, 키리누키 채널, 치지직·SOOP 에 같은 이름이 있는 버튜버는 넣지 않음 | 1분마다 대기열 20개 | 핸들 1개 1단위, UC… 50개 1단위 |
+
+- 켜는 조건: 웹 수집은 `CLIPS_ENABLED=1`(Claude) + YouTube 키. 확인·영상·노래는 YouTube 키만 있으면 됩니다.
+- **한국어 버튜버**(region `ko`)는 유튜브에서 방송하면 LIVE 목록에도 나옵니다. **해외 버튜버**(`foreign`)는 프로필·검색·키리누키·노래에만 나오고 LIVE 목록에는 넣지 않습니다. 유튜브 시청자 수는 랭킹·합계에 넣지 않습니다(기존과 같음).
+- 나중에 치지직·SOOP 버튜버의 공식 채널로 연결되면 유튜브 전용 목록에서는 자동으로 빠집니다 (프로필 하나로).
+- 키리누키 연결: 새 클립은 분류할 때 후보 이름에 들어갑니다. 등록 전에 들어온 클립은 **RSS 제목·버모아 요약에 이름 전체(한글 3글자 이상)가 나올 때만** 이어 줍니다.
+- 정책: Claude 에는 RSS 로 받은 키리누키 제목만 넣습니다 (videos.list 로 바뀐 제목은 뺌). 이름·소속은 웹 출처 기준이고, 화면에는 "버모아가 웹 자료로 찾은 공식 채널이라 틀릴 수 있어요"를 표시합니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 vtubers               # 목록 (all = 제외한 것 포함, queue = 확인 대기)
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 vtuber-add https://www.youtube.com/@핸들 "이름" "소속" foreign   # 직접 추가 (한국어 버튜버면 마지막 생략)
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 vtuber-block "이름"    # 버튜버가 아니거나 잘못 찾은 채널 제외
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 vtuber-ok "이름"       # 확인 표시 (자동 수집이 이름을 안 바꿈)
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 vtuber-name "이름" "새 이름"
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 vtuber-discover        # 지금 바로 웹 수집
+```
+
+## 6. 노래 모음 — 공식 채널 커버·오리지널 (2026-11-13)
+
+공식 채널(치지직·SOOP 버튜버의 연결된 채널 + 유튜브 전용 버튜버) 영상 중 **제목에 커버·오리지널 표기가 있는 노래**만 모읍니다. 화면은 `/songs`(전체·커버·오리지널, 검색), 프로필 **노래** 탭, 홈 "새로 올라온 노래", 통합 검색의 노래 결과. 사이트 안 플레이어로 재생하고 목록 순서대로 이어서 재생합니다.
+
+| 작업 | 주기 | 할당량 |
+| --- | --- | --- |
+| **새 노래** — 공식 채널 RSS 제목에 표기가 있으면 후보 | RSS 확인 때 (위 3장) | 0 |
+| **예전 노래** — 업로드 목록(`playlistItems.list`)을 채널마다 한 번 끝까지(최근 2,000개) 훑음. 이후 30일마다 앞쪽 100개만 다시 | 1분마다 4쪽 | 50개당 1단위 |
+| **확인** — 제목·길이·공개 상태(`videos.list`). 1분 초과 15분 이하만 보이고, 쇼츠·방송 다시보기·삭제·비공개는 뺌. 공개 전 프리미어는 6시간마다 다시. 보이는 노래는 20일마다 다시 확인(제목도 최신으로) | 1분마다 200개까지 | 50개당 1단위 |
+
+- 노래 수집은 하루 `YOUTUBE_SONGS_BUDGET`(기본 1,500)단위까지만 씁니다. 처음 훑기는 채널 200여 개 기준 며칠에 나눠 끝나고, 그 뒤로는 하루 몇십 단위입니다. `YOUTUBE_SONGS=0` 이면 끔.
+- 판정 규칙(`server/src/youtube/songs.ts`): 커버 = `cover`·`커버`·`歌ってみた`·`불러보았다` 등, 오리지널 = `Original Song`·`오리지널 곡`·`(Original)`·`MV`·`자작곡`·`가사 영상` 등. 쇼츠·티저·노래 방송·반응·클립·반주·데뷔 공지는 제외. 운영 공식 채널 RSS 1,589개 제목으로 맞춰 봄(109개 판정, 오판은 커버 MV 를 오리지널로 본 1건 정도).
+- 정책: 새 정보·지표를 만들지 않습니다 — 공식 영상 중 제목 표기로 노래만 골라 보여 줄 뿐이고, 조회수는 받지도 쓰지도 않으며 순서는 올린 날짜뿐입니다. API 로 받은 제목·길이는 20일마다 다시 받고 30일 넘게 확인 못 한 것은 지웁니다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\windows\youtube.ps1 songs 20   # 수집 상태 + 최근 노래 20곡
+```
+
 ## 할당량
 
 | 항목 | 하루 기본 한도 |
@@ -132,6 +175,7 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\clips.ps1 events 14     
 - 새 영상 발견은 채널 RSS(`youtube.com/feeds/videos.xml?channel_id=…`)로 합니다. 할당량을 쓰지 않습니다.
 - 라이브 여부, 조회수 같은 상세 정보만 `videos.list` 로 50개씩 묶어 확인합니다.
 - `search.list` 는 하루 100회뿐이라 새 키리누키 채널을 찾는 데에만 씁니다.
+- 노래 모음은 업로드 목록(`playlistItems.list`, 50개 1단위)으로 한 번 훑고 이후는 RSS 로 이어 갑니다. 하루 노래 몫은 `YOUTUBE_SONGS_BUDGET` 로 따로 묶습니다.
 
 한도가 모자라면 Cloud Console 의 할당량 화면에서 증설을 신청할 수 있습니다. 이때 YouTube API 준수 감사를 받습니다.
 

@@ -21,6 +21,7 @@ import type {
   ClipDetail,
   ClipTagCount,
   SearchResponse,
+  Song,
 } from "@/types";
 import {
   fetchLivesFromBackend,
@@ -38,6 +39,7 @@ import {
   fetchClipTags,
   fetchClip,
   fetchSearch,
+  fetchSongs,
 } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
@@ -224,6 +226,14 @@ export async function getIssueSlugs(): Promise<string[]> {
 }
 
 // ---- 키리누키 (백엔드 없으면 빈 목록)
+
+export async function getSongs(q: Parameters<typeof fetchSongs>[0]): Promise<{ total: number; songs: Song[] }> {
+  try {
+    return await fetchSongs(q);
+  } catch {
+    return { total: 0, songs: [] };
+  }
+}
 
 export async function getClips(q: Parameters<typeof fetchClips>[0]): Promise<{ total: number; clips: Clip[] }> {
   try {

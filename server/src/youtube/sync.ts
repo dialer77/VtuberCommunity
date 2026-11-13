@@ -3,6 +3,8 @@
 //  2) RSS    1분마다 확인할 차례인 채널만 — 최근 라이브가 있던 채널 10분, 나머지 60분 (할당량 0)
 //  3) 상세   1분마다 (키가 있을 때) — 새 영상 상세, 방송 중·곧 시작할 예정 영상 상태 (videos.list 50개 1단위)
 //  4) 정리   30일 넘은 API 값 갱신·삭제 (정책)
+//  5) 노래   공식 채널의 커버·오리지널 (youtube/songs.ts)
+//  6) 유튜브 전용 버튜버 대기열 확인 (youtube/vtubers.ts)
 // 유튜브 시청자 수는 LIVE 목록에만 쓰고 랭킹·합계·데뷔 감지(live_snapshots)에는 넣지 않는다.
 import type { SqliteStore } from "../store/sqlite";
 import type { Platform } from "../domain";
@@ -12,6 +14,8 @@ import { log } from "../log";
 import { fetchSocialLinks, pickYoutube } from "./links";
 import { fetchFeed } from "./rss";
 import { QuotaExceededError, channelByHandle, channelsByIds, quotaAllows, videosByIds, ytApiEnabled } from "./api";
+import { runSongs, songsFromFeed } from "./songs";
+import { resolveQueue } from "./vtubers";
 
 const MIN = 60_000;
 const MAP_EVERY_MS = 10 * MIN;
@@ -163,6 +167,7 @@ export async function runFeeds(store: SqliteStore, limit = FEEDS_PER_TICK): Prom
       const f = feeds[k] ?? null;
       if (!f) failed++;
       added += repo.saveFeed(id, f).added.length;
+      if (f) songsFromFeed(store, id, f.entries);
     });
   }
   return { fetched: due.length, added, failed };
@@ -209,6 +214,9 @@ export function youtubeSyncStatus(store: SqliteStore) {
     apiKey: ytApiEnabled(),
     links: store.youtube.statusCounts(),
     channels: store.youtube.mappedYtChannels().length,
+    ytOnlyVtubers: store.youtube.listVtubers().length,
+    ytOnlyQueue: store.youtube.listQueue(1000).length,
+    songs: store.youtube.songStatus(),
   };
 }
 
@@ -240,6 +248,8 @@ export function startYoutubeSync(store: SqliteStore): void {
           if (e instanceof QuotaExceededError) log.info(`유튜브: ${e.message} — 내일(태평양 자정) 다시`);
           else log.error(`유튜브 상세 실패: ${String(e)}`);
         });
+        await resolveQueue(store).catch((e) => log.error(`유튜브 전용 버튜버 확인 실패: ${String(e)}`));
+        await runSongs(store);
       }
       if (Date.now() - lastPurgeAt >= PURGE_EVERY_MS) {
         lastPurgeAt = Date.now();

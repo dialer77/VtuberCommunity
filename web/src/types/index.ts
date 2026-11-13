@@ -238,6 +238,28 @@ export interface ChannelProfile {
   youtube?: YoutubeChannel | null;
   /** 키리누키 (없으면 null) */
   clips?: ProfileClips | null;
+  /** 공식 채널 노래 (커버·오리지널, 없으면 null) */
+  songs?: ProfileSongs | null;
+  /** 유튜브 전용 버튜버 (치지직·SOOP 채널 없음)일 때만 */
+  ytOnly?: { group: string | null; region: "ko" | "foreign"; aliases: string[]; verified: boolean } | null;
+}
+
+/** 공식 채널 노래 하나 — 제목에 커버·오리지널 표기가 있는 공식 영상 */
+export interface Song {
+  videoId: string;
+  title: string;
+  publishedAt: string;
+  thumbnailUrl: string;
+  kind: "cover" | "original";
+  durationSec: number | null;
+  vtuber: { platform: Platform; channelId: string; name: string } | null;
+}
+
+export interface ProfileSongs {
+  total: number;
+  cover: number;
+  original: number;
+  songs: Song[];
 }
 
 /** 이슈 타임라인 아이템 (수동 큐레이션 콘텐츠) */
@@ -381,6 +403,8 @@ export interface SearchResult {
   /** 마지막 방송 날짜 YYYY-MM-DD (KST) */
   lastLiveDate: string | null;
   firstSeenAt: string;
+  /** 유튜브 전용 버튜버의 소속 */
+  group?: string | null;
 }
 
 export interface SearchResponse {

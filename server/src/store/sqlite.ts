@@ -1112,6 +1112,17 @@ export class SqliteStore implements Store {
       `)
       .all(...uniq) as unknown as Array<{ id: string; name: string }>;
     for (const r of rows) out.set(r.id, r.name);
+    const rest = uniq.filter((id) => !out.has(id) && id.startsWith("UC"));
+    if (rest.length) {
+      try {
+        const yt = this.db
+          .prepare(`SELECT yt_channel_id AS id, name FROM yt_vtubers WHERE yt_channel_id IN (${rest.map(() => "?").join(",")})`)
+          .all(...rest) as unknown as Array<{ id: string; name: string }>;
+        for (const r of yt) out.set(r.id, r.name);
+      } catch {
+        // 유튜브 연동 테이블이 없으면 생략
+      }
+    }
     return out;
   }
 
@@ -1185,6 +1196,16 @@ export class SqliteStore implements Store {
     }));
 
     return { channels, aliases, lastTags, activity };
+  }
+
+  /** 치지직·SOOP 채널의 이름 (지금·예전 이름·확정 목록) — 유튜브 전용 버튜버 중복 확인용 */
+  streamerNames(): string[] {
+    const rows = this.db
+      .prepare(`
+        SELECT name FROM channels UNION SELECT DISTINCT name FROM channel_daily UNION SELECT name FROM vtuber_registry
+      `)
+      .all() as unknown as Array<{ name: string }>;
+    return rows.map((r) => r.name);
   }
 
   /**

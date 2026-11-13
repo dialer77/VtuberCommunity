@@ -7,7 +7,8 @@ import { PlatformBadge } from "@/components/platform-badge";
 import { SearchIcon } from "@/components/search/header-search";
 import { formatCount, formatDate, formatYmd } from "@/lib/format";
 import { ClipGrid } from "@/components/clip-card";
-import type { Clip, SearchResponse, SearchResult, TagCount, TagKind, VmoaTag } from "@/types";
+import { SongGrid } from "@/components/song-card";
+import type { Clip, SearchResponse, SearchResult, Song, TagCount, TagKind, VmoaTag } from "@/types";
 
 export const PAGE_SIZE = 30;
 const KIND_LABEL: Record<TagKind, string> = { agency: "소속사", concept: "컨셉", content: "콘텐츠" };
@@ -274,12 +275,44 @@ export function SearchView({ initial, initialQuery }: { initial: SearchResponse 
         </>
       ) : null}
 
+      <SongResults q={query.q} />
       <ClipResults q={query.q} />
     </div>
   );
 }
 
 /** 같은 검색어로 찾은 키리누키 (제목·요약·게임·사건·버튜버·채널) */
+function SongResults({ q }: { q: string }) {
+  const [res, setRes] = useState<{ q: string; total: number; songs: Song[] } | null>(null);
+  const text = q.trim();
+  useEffect(() => {
+    if (!text) return;
+    const ac = new AbortController();
+    const h = setTimeout(() => {
+      fetch(`/api/song-search?q=${encodeURIComponent(text)}&limit=6`, { signal: ac.signal })
+        .then((r) => (r.ok ? r.json() : { total: 0, songs: [] }))
+        .then((j: { total?: number; songs?: Song[] }) => setRes({ q: text, total: j.total ?? 0, songs: j.songs ?? [] }))
+        .catch(() => undefined);
+    }, 300);
+    return () => {
+      clearTimeout(h);
+      ac.abort();
+    };
+  }, [text]);
+  if (!text || !res || res.q !== text || res.total === 0) return null;
+  return (
+    <section className="flex flex-col gap-3" aria-label="노래 검색 결과">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-bold text-muted">노래 {formatCount(res.total)}곡</h2>
+        <Link href={`/songs?q=${encodeURIComponent(text)}`} className="text-sm text-accent hover:underline">
+          노래 모두 보기 →
+        </Link>
+      </div>
+      <SongGrid songs={res.songs} narrow />
+    </section>
+  );
+}
+
 function ClipResults({ q }: { q: string }) {
   const [res, setRes] = useState<{ q: string; total: number; clips: Clip[] } | null>(null);
   const text = q.trim();
@@ -358,6 +391,7 @@ function TagFilter({
 }
 
 function lastSeenText(r: SearchResult): string {
+  if (r.platform === "youtube") return `${r.group ? `${r.group} · ` : ""}유튜브에서 활동`;
   if (r.lastLiveDate) return `마지막 방송 ${formatYmd(r.lastLiveDate)}`;
   return `처음 본 날 ${formatDate(r.firstSeenAt)}`;
 }

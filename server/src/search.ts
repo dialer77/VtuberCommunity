@@ -1,4 +1,4 @@
-// 버튜버 검색 — 수집 DB 에 있는 채널 전체(방송 중이 아니어도)를 이름·예전 이름·유튜브 채널명·초성·태그로 찾는다.
+// 버튜버 검색 — 수집 DB 에 있는 채널 전체(방송 중이 아니어도) + 유튜브 전용 버튜버를 이름·예전 이름·유튜브 채널명·초성·태그로 찾는다.
 // 색인은 메모리에 두고 10분마다 다시 만든다 (채널 수천 개 수준이라 매 요청 선형 탐색으로 충분).
 import type { SqliteStore, LiveItem } from "./store/sqlite";
 import type { Platform } from "./domain";
@@ -30,6 +30,8 @@ export interface SearchResult {
   /** 마지막 방송 날짜 (KST, 일별 집계 기준 — 집계 시작 전 방송만 있으면 null) */
   lastLiveDate: string | null;
   firstSeenAt: string;
+  /** 유튜브 전용 버튜버의 소속 (그 밖에는 null) */
+  group: string | null;
 }
 
 export interface SearchResponse {
@@ -59,6 +61,7 @@ interface Entry {
   vm30: number;
   peak: number;
   firstSeenAt: string;
+  group: string | null;
 }
 
 /** 비교용 정규화: 소문자, 공백·문장부호·기호 제거 (한글 호환 자모는 그대로 두려고 NFKC 대신 NFC) */
@@ -123,6 +126,34 @@ function buildIndex(store: SqliteStore): Entry[] {
       vm30: act?.viewerMinutes30 ?? 0,
       peak: act?.peak ?? 0,
       firstSeenAt: ch.firstSeenAt,
+      group: null,
+    });
+  }
+  // 유튜브 전용 버튜버: 이름·별칭·유튜브 채널명·핸들·소속으로
+  for (const v of store.youtube.listVtubers()) {
+    const ch = store.youtube.getChannel(v.ytChannelId);
+    const names: string[] = [];
+    const rawNames: string[] = [];
+    for (const raw of [v.name, ...v.aliases, ch?.title ?? "", ch?.handle ?? "", v.group ?? ""]) {
+      const n = normalize(raw);
+      if (!n || names.includes(n)) continue;
+      names.push(n);
+      rawNames.push(raw);
+    }
+    if (names.length === 0) continue;
+    entries.push({
+      platform: "youtube",
+      channelId: v.ytChannelId,
+      name: v.name,
+      names,
+      rawNames,
+      cho: names.map(chosung),
+      tags: [],
+      lastDate: null,
+      vm30: 0,
+      peak: 0,
+      firstSeenAt: v.addedAt,
+      group: v.group,
     });
   }
   log.info(`검색 색인 ${entries.length}개 채널 (${Date.now() - t0}ms)`);
@@ -265,6 +296,7 @@ export function searchChannels(
       liveTitle: live ? live.title : null,
       lastLiveDate: e.lastDate,
       firstSeenAt: e.firstSeenAt,
+      group: e.group,
     };
   });
 

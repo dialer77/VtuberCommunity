@@ -106,6 +106,10 @@ const str = (v: unknown): string | null => (typeof v === "string" && v ? v : nul
 
 /** 화면에 보여도 되는 클립: 분류 완료 + 차단되지 않은 채널 */
 const VISIBLE = `c.class_status = 'done' AND ch.status != 'blocked'`;
+/** 버튜버 이름 (치지직·SOOP 채널 + 유튜브 전용 버튜버 이름·별칭) — 클립 검색용 */
+const VT_NAMES = `(SELECT channel_id, name FROM channels
+  UNION ALL SELECT yt_channel_id AS channel_id, name FROM yt_vtubers WHERE status != 'blocked'
+  UNION ALL SELECT y.yt_channel_id AS channel_id, j.value AS name FROM yt_vtubers y, json_each(y.aliases) j WHERE y.status != 'blocked')`;
 
 export class ClipRepo {
   constructor(private readonly db: DatabaseSync) {
@@ -771,14 +775,14 @@ export class ClipRepo {
     for (const w of words.filter(Boolean)) {
       conds.push(`(c.title LIKE ? ESCAPE '\\' OR c.summary LIKE ? ESCAPE '\\' OR c.topic LIKE ? ESCAPE '\\' OR c.event LIKE ? ESCAPE '\\'
         OR ch.title LIKE ? ESCAPE '\\'
-        OR EXISTS (SELECT 1 FROM clip_vtubers v JOIN channels n ON n.channel_id = v.channel_id WHERE v.video_id = c.video_id AND n.name LIKE ? ESCAPE '\\'))`);
+        OR EXISTS (SELECT 1 FROM clip_vtubers v JOIN ${VT_NAMES} n ON n.channel_id = v.channel_id WHERE v.video_id = c.video_id AND n.name LIKE ? ESCAPE '\\'))`);
       const l = like(w);
       params.push(l, l, l, l, l, l);
     }
     const rows = this.db
       .prepare(`
         SELECT c.video_id, c.title, c.summary, c.topic, c.event, ch.title AS ch_title, c.published_at, COALESCE(st.likes, 0) AS likes,
-          (SELECT group_concat(n.name, '|') FROM clip_vtubers v JOIN channels n ON n.channel_id = v.channel_id WHERE v.video_id = c.video_id) AS names
+          (SELECT group_concat(n.name, '|') FROM clip_vtubers v JOIN ${VT_NAMES} n ON n.channel_id = v.channel_id WHERE v.video_id = c.video_id) AS names
         FROM clips c JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
         LEFT JOIN clip_stats st ON st.video_id = c.video_id
         WHERE ${conds.join(" AND ")}
@@ -990,6 +994,33 @@ export class ClipRepo {
     const rows = this.selectClips(`c.video_id IN (${ids.map(() => "?").join(",")}) AND ${VISIBLE}`, "", ids);
     const byId = new Map(rows.map((r) => [r.videoId, r]));
     return ids.map((id) => byId.get(id)).filter((r): r is ClipRow => !!r);
+  }
+
+  /**
+   * 출연 버튜버를 못 찾은 보이는 클립 (유튜브 전용 버튜버가 새로 등록되면 이름으로 다시 연결).
+   * rssTitle = RSS 로 받은 제목 (videos.list 로 바뀐 적 있으면 null — API 데이터는 새 정보의 재료로 쓰지 않는다)
+   */
+  unlinkedClips(limit: number): { videoId: string; rssTitle: string | null; summary: string | null }[] {
+    const rows = this.db
+      .prepare(`
+        SELECT c.video_id, CASE WHEN c.checked_at IS NULL THEN c.title END AS title, c.summary
+        FROM clips c JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
+        WHERE ${VISIBLE} AND NOT EXISTS (SELECT 1 FROM clip_vtubers v WHERE v.video_id = c.video_id)
+        ORDER BY c.published_at DESC LIMIT ?
+      `)
+      .all(limit) as unknown as Array<{ video_id: string; title: string | null; summary: string | null }>;
+    return rows.map((r) => ({ videoId: r.video_id, rssTitle: r.title, summary: r.summary }));
+  }
+
+  /** 클립에 출연 버튜버 더하기 (이미 있으면 그대로). 더한 수 */
+  addClipVtubers(videoId: string, vts: { platform: Platform; channelId: string }[]): number {
+    const pos = (this.db.prepare(`SELECT COALESCE(MAX(position) + 1, 0) AS p FROM clip_vtubers WHERE video_id = ?`).get(videoId) as { p: number }).p;
+    const ins = this.db.prepare(`INSERT OR IGNORE INTO clip_vtubers (video_id, platform, channel_id, position) VALUES (?, ?, ?, ?)`);
+    let n = 0;
+    vts.forEach((v, i) => {
+      n += Number(ins.run(videoId, v.platform, v.channelId, Number(pos) + i).changes);
+    });
+    return n;
   }
 
   /** 좋아요·투표·재생목록에 담을 수 있는 클립인지 (분류 완료 + 차단 안 됨) */

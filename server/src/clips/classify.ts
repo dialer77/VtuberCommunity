@@ -31,6 +31,8 @@ interface NameEntry {
   label: string;
   full: string;
   parts: string[];
+  /** 이름 전체로 치는 다른 표기 (유튜브 전용 버튜버의 별칭) */
+  alts?: string[];
   rank: number;
 }
 
@@ -38,13 +40,13 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, "");
 }
 
-/** 알려진 버튜버 이름 목록 (상위·방송 중·확정 목록 + 매핑 기록) */
+/** 알려진 버튜버 이름 목록 (상위·방송 중·확정 목록 + 매핑 기록 + 유튜브 전용 버튜버) */
 export function buildNameIndex(store: SqliteStore): NameEntry[] {
   const seen = new Set<string>();
   const raw: Omit<NameEntry, "label">[] = [];
-  const add = (platform: Platform, channelId: string, name: string) => {
+  const add = (platform: Platform, channelId: string, name: string, aliases: string[] = []) => {
     const k = `${platform}:${channelId}`;
-    if (seen.has(k) || (platform !== "chzzk" && platform !== "soop")) return;
+    if (seen.has(k)) return;
     seen.add(k);
     const full = norm(name);
     if (full.length < 2) return;
@@ -53,13 +55,16 @@ export function buildNameIndex(store: SqliteStore): NameEntry[] {
       .split(/[\s\p{P}\p{S}]+/u)
       .map(norm)
       .filter((p) => p.length >= 2 && p !== full);
-    raw.push({ platform, channelId, name, full, parts, rank: raw.length });
+    const alts = aliases.map(norm).filter((a) => a.length >= 3 && a !== full);
+    raw.push({ platform, channelId, name, full, parts, ...(alts.length ? { alts } : {}), rank: raw.length });
   };
   for (const t of mappingTargets(store, 400)) add(t.platform, t.channelId, t.name);
-  for (const l of store.youtube.listLinks()) add(l.platform, l.channelId, l.name);
+  for (const l of store.youtube.listLinks()) if (l.platform === "chzzk" || l.platform === "soop") add(l.platform, l.channelId, l.name);
+  for (const v of store.youtube.listVtubers()) add("youtube", v.ytChannelId, v.name, v.aliases);
   const count = new Map<string, number>();
   for (const e of raw) count.set(e.name, (count.get(e.name) ?? 0) + 1);
-  return raw.map((e) => ({ ...e, label: (count.get(e.name) ?? 0) > 1 ? `${e.name} (${e.platform === "soop" ? "SOOP" : "치지직"})` : e.name }));
+  const tag = (p: Platform) => (p === "soop" ? "SOOP" : p === "youtube" ? "유튜브" : "치지직");
+  return raw.map((e) => ({ ...e, label: (count.get(e.name) ?? 0) > 1 ? `${e.name} (${tag(e.platform)})` : e.name }));
 }
 
 /** 클립 하나의 버튜버 후보: 이름 전체가 나오면 먼저, 채널을 처음 찾은 버튜버, 이름 일부가 나오는 버튜버 */
@@ -68,7 +73,7 @@ export function candidatesFor(clip: ClipRow, index: NameEntry[]): NameEntry[] {
   const full: NameEntry[] = [];
   const partial: NameEntry[] = [];
   for (const e of index) {
-    if (hay.includes(e.full)) full.push(e);
+    if (hay.includes(e.full) || e.alts?.some((a) => hay.includes(a))) full.push(e);
     else if (e.parts.some((p) => hay.includes(p))) partial.push(e);
   }
   const hint = index.find((e) => e.platform === clip.hintPlatform && e.channelId === clip.hintChannelId);

@@ -41,6 +41,14 @@ export const config = {
   youtubeDailyBudget: Number(process.env.YOUTUBE_DAILY_BUDGET ?? 8000),
   /** 매핑 대상: 월간 시청시간 상위 N + 지금 방송 중 + 확정 목록 */
   youtubeMapTop: Number(process.env.YOUTUBE_MAP_TOP ?? 200),
+  /** 공식 채널 노래(커버·오리지널) 모음. 기본 켜짐(키가 있을 때), 0 = 끔 */
+  youtubeSongs: process.env.YOUTUBE_SONGS !== "0",
+  /** 노래 수집에 쓸 하루 단위 (업로드 목록 50개 1단위, 확인 50개 1단위) */
+  youtubeSongsBudget: Number(process.env.YOUTUBE_SONGS_BUDGET ?? 1500),
+  /** 유튜브 전용 버튜버 웹 수집(Claude) 주기(일). 0 = 끔. Claude 사용 기능(CLIPS_ENABLED)이 켜져 있어야 동작 */
+  ytVtubersDiscoverDays: Number(process.env.YT_VTUBERS_DISCOVER_DAYS ?? 7),
+  /** 한 번에 받을 유튜브 전용 버튜버 수 */
+  ytVtubersMaxPerRun: Number(process.env.YT_VTUBERS_MAX_PER_RUN ?? 40),
 
   // ---- 키리누키 수집·분류 (3단계) — docs/youtube-api.md 4장
   /** 켜기 (기본: 이슈 수집과 같이). YouTube 키도 있어야 동작 (채널 발견에 search.list) */

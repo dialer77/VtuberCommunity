@@ -38,12 +38,17 @@ export function searchName(name: string): string {
   return name.replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
 }
 
-/** 키리누키 채널을 찾을 버튜버 — 월간 시청시간 상위 N 중 30일 안에 검색하지 않은 순서대로 */
+/** 키리누키 채널을 찾을 버튜버 — 월간 시청시간 상위 N, 그다음 한국어 유튜브 전용 버튜버. 30일 안에 검색하지 않은 순서대로 */
 export function discoverTargets(store: SqliteStore, nowMs = Date.now()): DiscoverTarget[] {
-  return store
+  const top: DiscoverTarget[] = store
     .getPeriodRanking(30, "watch", config.clipsTop)
     .ranking.filter((r) => r.platform === "chzzk" || r.platform === "soop")
-    .map((r) => ({ platform: r.platform, channelId: r.channelId, name: r.channelName }))
+    .map((r) => ({ platform: r.platform, channelId: r.channelId, name: r.channelName }));
+  const ytOnly: DiscoverTarget[] = store.youtube
+    .listVtubers()
+    .filter((v) => v.region === "ko")
+    .map((v) => ({ platform: "youtube" as const, channelId: v.ytChannelId, name: v.name }));
+  return [...top, ...ytOnly]
     .filter((t) => {
       const at = Date.parse(store.clips.lastSearchedAt(t.platform, t.channelId) ?? "");
       return Number.isNaN(at) || nowMs - at > RESEARCH_AFTER_MS;

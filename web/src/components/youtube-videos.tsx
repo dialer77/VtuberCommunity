@@ -60,7 +60,7 @@ function VideoItem({ v, channel }: { v: YoutubeVideo; channel: string | null }) 
 }
 
 /** 프로필 '공식 영상' 탭 — 최신 영상 (누르면 사이트 안에서 재생) */
-export function YoutubeVideos({ yt }: { yt: YoutubeChannel }) {
+export function YoutubeVideos({ yt, ytOnly }: { yt: YoutubeChannel; ytOnly?: boolean }) {
   const name = yt.title ?? yt.handle ?? "YouTube";
   return (
     <div className="flex flex-col gap-3">
@@ -89,9 +89,11 @@ export function YoutubeVideos({ yt }: { yt: YoutubeChannel }) {
       )}
       <p className="text-xs text-muted-2">
         ※ 영상 정보 출처: YouTube.{" "}
-        {yt.status === "auto"
-          ? "채널 연결은 버모아가 방송 채널 소개의 링크로 자동 추정한 것이라 틀릴 수 있어요."
-          : "채널 연결은 버모아 운영자가 확인했어요."}
+        {yt.status === "manual"
+          ? "채널 연결은 버모아 운영자가 확인했어요."
+          : ytOnly
+            ? "버모아가 웹 자료(소속사·위키·기사)로 찾은 공식 채널이라 틀릴 수 있어요. 틀렸다면 문의로 알려 주세요."
+            : "채널 연결은 버모아가 방송 채널 소개의 링크로 자동 추정한 것이라 틀릴 수 있어요."}
       </p>
     </div>
   );

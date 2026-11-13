@@ -8,13 +8,14 @@ import { formatCount, formatDate, formatDateTime, formatYmd } from "@/lib/format
 import { FavoriteButton } from "@/components/auth/favorite-button";
 import { YoutubeLiveBox, YoutubeVideos } from "@/components/youtube-videos";
 import { ClipGrid, ClipNotice, ClipTagChip } from "@/components/clip-card";
+import { PlayAllSongs, SongGrid, SongNotice } from "@/components/song-card";
 import { isIndexableProfile, profileDescription, profileTopics } from "@/lib/seo";
 import { PLATFORMS } from "@/types";
 
 export const dynamic = "force-dynamic";
 
 type Params = Promise<{ platform: string; channelId: string }>;
-type Search = Promise<{ tab?: string }>;
+type Search = Promise<{ tab?: string; kind?: string }>;
 
 export async function generateMetadata({
   params,
@@ -25,7 +26,9 @@ export async function generateMetadata({
   const p = await getChannelProfile(platform, channelId);
   if (!p) return { title: "스트리머를 찾을 수 없음" };
   const description = profileDescription(p);
-  const title = `${p.name} (${PLATFORMS[p.platform].label}) 방송 기록·클립`;
+  const title = p.ytOnly
+    ? `${p.name} (YouTube) 노래·영상·클립`
+    : `${p.name} (${PLATFORMS[p.platform].label}) 방송 기록·클립`;
   return {
     title,
     description,
@@ -44,20 +47,27 @@ export default async function VtuberProfilePage({
   params: Params;
   searchParams: Search;
 }) {
-  const [{ platform, channelId }, { tab }] = await Promise.all([params, searchParams]);
+  const [{ platform, channelId }, { tab, kind }] = await Promise.all([params, searchParams]);
   const p = await getChannelProfile(platform, channelId);
   if (!p) notFound();
   const yt = p.youtube ?? null;
   const clips = p.clips ?? null;
-  const activeTab: "history" | "videos" | "clips" =
-    tab === "videos" && yt ? "videos" : tab === "clips" && clips ? "clips" : "history";
+  const songs = p.songs ?? null;
+  // 유튜브 전용 버튜버는 방송 기록이 없다 → 공식 영상(또는 노래·키리누키)이 첫 탭
+  const ytOnly = p.ytOnly ?? null;
+  type Tab = "history" | "videos" | "songs" | "clips";
+  const firstTab: Tab = ytOnly ? (yt ? "videos" : songs ? "songs" : "clips") : "history";
+  const activeTab: Tab =
+    tab === "videos" && yt ? "videos" : tab === "songs" && songs ? "songs" : tab === "clips" && clips ? "clips" : firstTab;
+  const songKind = kind === "cover" || kind === "original" ? kind : undefined;
+  const shownSongs = songs ? songs.songs.filter((s) => !songKind || s.kind === songKind) : [];
   const base = `/vtuber/${p.platform}/${p.channelId}`;
   const topics = profileTopics(p.broadcasts);
   // 구조화 데이터 (검색엔진용) — 공식 채널 주소를 sameAs 로
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "ProfilePage",
-    name: `${p.name} 방송 기록·클립`,
+    name: ytOnly ? `${p.name} 노래·영상·클립` : `${p.name} 방송 기록·클립`,
     url: `${process.env.SITE_URL ?? ""}${base}`,
     mainEntity: {
       "@type": "Person",
@@ -101,6 +111,12 @@ export default async function VtuberProfilePage({
                 </span>
               )}
             </div>
+            {ytOnly ? (
+              <p className="mt-1.5 text-xs text-muted-2">
+                {ytOnly.group ? <span className="text-muted">{ytOnly.group} · </span> : null}
+                유튜브에서 활동하는 버튜버{ytOnly.region === "foreign" ? " (해외)" : ""}
+              </p>
+            ) : null}
             {p.tags.length > 0 ? (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {p.tags.map((t) => (
@@ -125,7 +141,16 @@ export default async function VtuberProfilePage({
           <FavoriteButton target={{ platform: p.platform, channelId: p.channelId, channelName: p.name }} />
         </div>
 
-        {p.isLive ? (
+        {ytOnly ? (
+          <a
+            href={p.channelUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md border border-border text-sm font-semibold px-3 py-2 text-center hover:border-accent/60 transition-colors"
+          >
+            YouTube 채널 방문 →
+          </a>
+        ) : p.isLive ? (
           <div className="flex flex-col gap-2 rounded-lg bg-surface-2 p-3">
             <p className="text-sm font-medium line-clamp-1">
               {p.currentTitle ?? "방송 중"}
@@ -187,27 +212,79 @@ export default async function VtuberProfilePage({
         </section>
       ) : null}
 
-      {/* 통계 */}
-      <section className="grid grid-cols-3 gap-3">
-        <StatBox label="최고 동접" value={`${formatCount(p.peakViewers)}명`} />
-        <StatBox label="관측 방송" value={`${formatCount(p.broadcastCount)}회`} />
-        <StatBox label="감지일" value={formatDate(p.firstSeenAt)} />
-      </section>
+      {/* 통계 (유튜브 전용 버튜버는 방송 수치를 모으지 않는다 — 노래·클립 수만) */}
+      {ytOnly ? (
+        <section className="grid grid-cols-3 gap-3">
+          <StatBox label="공식 노래" value={`${formatCount(songs?.total ?? 0)}곡`} />
+          <StatBox label="키리누키" value={`${formatCount(clips?.total ?? 0)}개`} />
+          <StatBox label="버모아 등록" value={formatDate(p.firstSeenAt)} />
+        </section>
+      ) : (
+        <section className="grid grid-cols-3 gap-3">
+          <StatBox label="최고 동접" value={`${formatCount(p.peakViewers)}명`} />
+          <StatBox label="관측 방송" value={`${formatCount(p.broadcastCount)}회`} />
+          <StatBox label="감지일" value={formatDate(p.firstSeenAt)} />
+        </section>
+      )}
 
-      {/* 탭: 이전 방송 기록 · 공식 영상(유튜브 채널이 연결됐을 때) · 키리누키(클립이 있을 때) */}
-      {yt || clips ? (
+      {/* 탭: 이전 방송 기록 · 공식 영상(유튜브 채널이 연결됐을 때) · 노래 · 키리누키(클립이 있을 때) */}
+      {yt || clips || songs ? (
         <nav className="flex flex-wrap gap-2" aria-label="프로필 탭">
-          <TabLink href={base} active={activeTab === "history"} label="이전 방송 기록" />
+          {ytOnly ? null : <TabLink href={base} active={activeTab === "history"} label="이전 방송 기록" />}
           {yt ? (
-            <TabLink href={`${base}?tab=videos`} active={activeTab === "videos"} label={`공식 영상${yt.videos.length ? ` ${yt.videos.length}` : ""}`} />
+            <TabLink
+              href={firstTab === "videos" ? base : `${base}?tab=videos`}
+              active={activeTab === "videos"}
+              label={`공식 영상${yt.videos.length ? ` ${yt.videos.length}` : ""}`}
+            />
           ) : null}
-          {clips ? <TabLink href={`${base}?tab=clips`} active={activeTab === "clips"} label={`키리누키 ${clips.total}`} /> : null}
+          {songs ? (
+            <TabLink href={firstTab === "songs" ? base : `${base}?tab=songs`} active={activeTab === "songs"} label={`노래 ${songs.total}`} />
+          ) : null}
+          {clips ? (
+            <TabLink href={firstTab === "clips" ? base : `${base}?tab=clips`} active={activeTab === "clips"} label={`키리누키 ${clips.total}`} />
+          ) : null}
         </nav>
       ) : null}
 
       {activeTab === "videos" && yt ? (
         <section className="flex flex-col gap-3" aria-label="공식 영상">
-          <YoutubeVideos yt={yt} />
+          <YoutubeVideos yt={yt} ytOnly={!!ytOnly} />
+        </section>
+      ) : activeTab === "songs" && songs ? (
+        <section className="flex flex-col gap-4" aria-label="노래">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              {[
+                { id: undefined, label: `전체 ${songs.total}` },
+                { id: "cover" as const, label: `커버 ${songs.cover}` },
+                { id: "original" as const, label: `오리지널 ${songs.original}` },
+              ]
+                .filter((o) => !o.id || (o.id === "cover" ? songs.cover : songs.original) > 0)
+                .map((o) => (
+                  <Link
+                    key={o.label}
+                    href={`${base}?tab=songs${o.id ? `&kind=${o.id}` : ""}`}
+                    scroll={false}
+                    className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                      songKind === o.id
+                        ? "border-accent bg-accent text-accent-fg font-semibold"
+                        : "border-border bg-surface text-muted hover:border-accent/50 hover:text-foreground"
+                    }`}
+                  >
+                    {o.label}
+                  </Link>
+                ))}
+            </div>
+            <PlayAllSongs songs={shownSongs} />
+          </div>
+          <SongGrid songs={shownSongs} narrow showVtuber={false} />
+          {songs.total > songs.songs.length ? (
+            <Link href={`/songs?v=${p.platform}:${p.channelId}`} className="w-fit text-sm text-accent hover:underline">
+              노래 {songs.total}곡 모두 보기 →
+            </Link>
+          ) : null}
+          <SongNotice />
         </section>
       ) : activeTab === "clips" && clips ? (
         <section className="flex flex-col gap-4" aria-label="키리누키">
@@ -254,7 +331,7 @@ export default async function VtuberProfilePage({
         </section>
       ) : (
       <section className="flex flex-col gap-3">
-        {yt || clips ? null : <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>}
+        {yt || clips || songs ? null : <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>}
         {p.broadcasts.length === 0 ? (
           <p className="text-sm text-muted-2">아직 기록된 방송이 없어요.</p>
         ) : (

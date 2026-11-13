@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getLiveStreams, getTags } from "@/lib/data";
+import { getLiveStreams, getSongs, getTags } from "@/lib/data";
+import { SongGrid } from "@/components/song-card";
 import { LiveCard } from "@/components/live-card";
 import { Stat } from "@/components/stat";
 import { TagBar } from "@/components/tag-bar";
@@ -16,7 +17,7 @@ export default async function HomePage({
   searchParams: Promise<{ tag?: string }>;
 }) {
   const { tag } = await searchParams;
-  const [lives, tags] = await Promise.all([getLiveStreams(tag), getTags()]);
+  const [lives, tags, newSongs] = await Promise.all([getLiveStreams(tag), getTags(), getSongs({ limit: 8 })]);
   // 유튜브 시청자 수는 합산하지 않는다 (YouTube API 정책 — 여러 채널의 수치를 합치지 않음)
   const totalViewers = lives.reduce((s, l) => s + (l.platform === "youtube" ? 0 : l.viewers), 0);
   const hasYoutube = lives.some((l) => l.platform === "youtube");
@@ -65,6 +66,18 @@ export default async function HomePage({
       )}
 
       <AdSlot slot="home-mid" />
+
+      {newSongs.songs.length > 0 ? (
+        <section className="flex flex-col gap-3" aria-label="새 노래">
+          <div className="flex items-baseline justify-between">
+            <h2 className="font-bold">새로 올라온 노래</h2>
+            <Link href="/songs" className="text-sm text-accent hover:underline">
+              노래 모두 보기 →
+            </Link>
+          </div>
+          <SongGrid songs={newSongs.songs} />
+        </section>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2">
         <CtaCard

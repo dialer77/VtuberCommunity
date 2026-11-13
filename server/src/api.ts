@@ -12,7 +12,7 @@ import {
 } from "./tags/catalog";
 import { curatedProfile } from "./profiles";
 import { searchChannels } from "./search";
-import { youtubeForProfile, youtubeLiveItems } from "./youtube/view";
+import { listSongsOut, songsForProfile, youtubeForProfile, youtubeLiveItems, ytOnlyProfile } from "./youtube/view";
 import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
 import { BUNDLE_IDS, upNextFor } from "./clips/recommend";
 import { forYou } from "./clips/foryou";
@@ -162,7 +162,9 @@ export function buildApi(store: SqliteStore) {
       .map((t) => t.trim())
       .filter(Boolean)
       .slice(0, 10);
-    return searchChannels(store, currentLivesAll(store), {
+    // 검색에는 해외 유튜브 전용 버튜버의 방송 중 표시도 (LIVE 목록에는 안 넣음)
+    const lives = [...store.getCurrentLives(), ...youtubeLiveItems(store, { includeForeign: true })];
+    return searchChannels(store, lives, {
       q: typeof q.q === "string" ? q.q : "",
       tags,
       limit: Number(q.limit) || 30,
@@ -276,28 +278,70 @@ export function buildApi(store: SqliteStore) {
   // 사이트맵 재료 — 검색 노출 대상 프로필(방송 3회 이상 또는 최근 90일 방송) + 보이는 클립
   app.get("/api/sitemap", async () => {
     const since = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    // 유튜브 전용 버튜버: 노래가 있거나 키리누키가 3개 이상 (웹 seo.ts 의 noindex 기준과 같게)
+    const ytOnly = store.youtube.listVtubers().flatMap((v) => {
+      const songs = store.youtube.songCounts(v.ytChannelId);
+      const clips = store.clips.listClips({ vtuber: { platform: "youtube", channelId: v.ytChannelId }, limit: 1, offset: 0 });
+      if (songs.cover + songs.original === 0 && clips.total < 3) return [];
+      return [{ platform: "youtube" as const, channelId: v.ytChannelId, lastLiveAt: clips.clips[0]?.publishedAt ?? v.updatedAt }];
+    });
     return {
-      channels: store.indexableChannels(3, since),
+      channels: [...store.indexableChannels(3, since), ...ytOnly],
       clips: store.clips.sitemapClips(20_000),
     };
   });
 
   // 채널 프로필 (자동 데이터 + VMOA 태그 + 큐레이션 정보)
   app.get("/api/channels/:platform/:channelId", async (req, reply) => {
-    const { channelId } = req.params as { platform: string; channelId: string };
+    const { platform, channelId } = req.params as { platform: string; channelId: string };
+    // 유튜브 전용 버튜버 (/vtuber/youtube/UC…)
+    if (platform === "youtube") {
+      const p = /^UC[\w-]{22}$/.test(channelId) ? ytOnlyProfile(store, channelId) : null;
+      if (!p) {
+        reply.code(404);
+        return { error: "채널을 찾을 수 없어요" };
+      }
+      const { rawTags: _raw, ...rest } = p;
+      return {
+        ...rest,
+        tags: [],
+        curated: curatedProfile(p.channelId),
+        clips: clipsForProfile(store, "youtube", p.channelId),
+        songs: songsForProfile(store, p.youtube),
+      };
+    }
     const profile = store.getChannelProfile(channelId);
     if (!profile) {
       reply.code(404);
       return { error: "채널을 찾을 수 없어요" };
     }
     const { rawTags, ...rest } = profile;
+    const youtube = youtubeForProfile(store, profile.platform, profile.channelId);
     return {
       ...rest,
       tags: toTagRefs(resolveChannelTags(profile.channelId, rawTags)),
       curated: curatedProfile(profile.channelId),
-      youtube: youtubeForProfile(store, profile.platform, profile.channelId),
+      youtube,
       clips: clipsForProfile(store, profile.platform, profile.channelId),
+      songs: songsForProfile(store, youtube),
     };
+  });
+
+  // 공식 채널 노래 (커버·오리지널, 올린 날짜순). ?kind=cover|original &platform=&channelId= &q=제목·버튜버 이름 &limit=24&offset=0
+  app.get("/api/songs", async (req) => {
+    const q = req.query as { kind?: string; platform?: string; channelId?: string; q?: string; limit?: string; offset?: string };
+    const kind = q.kind === "cover" || q.kind === "original" ? q.kind : undefined;
+    const vtuber =
+      q.platform && q.channelId && PLATFORMS.includes(q.platform as Platform)
+        ? { platform: q.platform as Platform, channelId: q.channelId }
+        : undefined;
+    return listSongsOut(store, {
+      kind,
+      vtuber,
+      q: typeof q.q === "string" ? q.q : undefined,
+      limit: Math.min(60, Math.max(1, Number(q.limit) || 24)),
+      offset: Math.max(0, Number(q.offset) || 0),
+    });
   });
 
   // 키리누키 (버모아 분류). ?tag=<분류 태그>&platform=&channelId=&limit=24&offset=0
@@ -578,7 +622,7 @@ export function buildApi(store: SqliteStore) {
     const favorites = await listFavorites((req.params as { userId: string }).userId);
     // 치지직·SOOP 방송을 우선, 그 채널이 유튜브에서만 방송 중이면 유튜브 방송
     const lives = new Map<string, LiveItem>();
-    for (const l of [...youtubeLiveItems(store), ...store.getCurrentLives()]) lives.set(l.channelId, l);
+    for (const l of [...youtubeLiveItems(store, { includeForeign: true }), ...store.getCurrentLives()]) lives.set(l.channelId, l);
     return {
       favorites: favorites.map((f) => {
         const live = lives.get(f.channelId);

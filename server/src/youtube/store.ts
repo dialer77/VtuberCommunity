@@ -2,6 +2,10 @@
 //  yt_links    버튜버(치지직·SOOP 주 채널) ↔ 유튜브 공식 채널 매핑. 자동 추정 + 운영자 확정
 //  yt_channels 유튜브 채널 정보 (RSS 제목, API 핸들·썸네일) + RSS 확인 일정
 //  yt_videos   채널 RSS 의 최신 영상 + videos.list 상세(라이브 상태·길이)
+//  yt_vtubers  유튜브에서만 활동하는 버튜버 (치지직·SOOP 채널 없음). 웹 수집(Claude)·데뷔 소식·운영자 추가
+//  yt_vtuber_queue  아직 채널 ID 를 확인하지 않은 유튜브 전용 버튜버 후보 (@핸들 → API 로 확인 후 yt_vtubers 로)
+//  yt_songs    공식 채널의 노래(커버·오리지널) — 제목 표기로 고르고 videos.list 로 길이·존재 확인 (30일 안에 갱신)
+//  yt_song_scans 업로드 목록(playlistItems) 훑기 진행 상황
 //
 // 정책(docs/youtube-api.md): API 로 받은 값은 30일 안에 다시 받거나 지운다 → *_at 컬럼으로 관리.
 // 유튜브 시청자 수는 live_snapshots(랭킹·합계의 원천)에 넣지 않고 여기에만 둔다.
@@ -143,6 +147,54 @@ export class YoutubeRepo {
       );
       CREATE INDEX IF NOT EXISTS idx_yt_videos_channel ON yt_videos(yt_channel_id, published_at);
       CREATE INDEX IF NOT EXISTS idx_yt_videos_live ON yt_videos(live_status);
+
+      CREATE TABLE IF NOT EXISTS yt_vtubers (
+        yt_channel_id TEXT PRIMARY KEY,
+        name          TEXT NOT NULL,
+        aliases       TEXT NOT NULL DEFAULT '[]',
+        grp           TEXT,
+        region        TEXT NOT NULL DEFAULT 'ko',
+        status        TEXT NOT NULL,
+        source        TEXT NOT NULL,
+        note          TEXT,
+        added_at      TEXT NOT NULL,
+        updated_at    TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS yt_vtuber_queue (
+        ref        TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        aliases    TEXT NOT NULL DEFAULT '[]',
+        grp        TEXT,
+        region     TEXT NOT NULL DEFAULT 'ko',
+        source     TEXT NOT NULL,
+        added_at   TEXT NOT NULL,
+        tries      INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS yt_songs (
+        video_id      TEXT PRIMARY KEY,
+        yt_channel_id TEXT NOT NULL,
+        title         TEXT NOT NULL,
+        published_at  TEXT NOT NULL,
+        kind          TEXT NOT NULL,
+        duration_sec  INTEGER,
+        state         TEXT NOT NULL DEFAULT 'new',
+        checked_at    TEXT,
+        source        TEXT NOT NULL,
+        first_seen_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_yt_songs_channel ON yt_songs(yt_channel_id, published_at);
+      CREATE INDEX IF NOT EXISTS idx_yt_songs_pub ON yt_songs(state, published_at);
+      CREATE TABLE IF NOT EXISTS yt_song_scans (
+        yt_channel_id TEXT PRIMARY KEY,
+        page_token    TEXT,
+        pages         INTEGER NOT NULL DEFAULT 0,
+        page_limit    INTEGER NOT NULL DEFAULT 0,
+        started_at    TEXT,
+        done_at       TEXT,
+        full_done     INTEGER NOT NULL DEFAULT 0
+      );
     `);
   }
 
@@ -276,11 +328,9 @@ export class YoutubeRepo {
     }
   }
 
-  /** 영상을 수집할 유튜브 채널 (자동·확정 매핑) */
+  /** 영상을 수집할 유튜브 채널 = 공식 채널 매핑(자동·확정) + 유튜브 전용 버튜버 */
   mappedYtChannels(): string[] {
-    const rows = this.db
-      .prepare(`SELECT DISTINCT yt_channel_id AS id FROM yt_links WHERE status IN ('auto', 'manual') AND yt_channel_id IS NOT NULL`)
-      .all() as unknown as Array<{ id: string }>;
+    const rows = this.db.prepare(TRACKED_SQL).all() as unknown as Array<{ id: string }>;
     return rows.map((r) => r.id);
   }
 
@@ -474,7 +524,7 @@ export class YoutubeRepo {
       .prepare(`
         SELECT v.* FROM yt_videos v
         WHERE v.live_status = 'live' AND v.detail_at >= ?
-          AND EXISTS (SELECT 1 FROM yt_links l WHERE l.yt_channel_id = v.yt_channel_id AND l.status IN ('auto', 'manual'))
+          AND v.yt_channel_id IN (${TRACKED_SQL})
         ORDER BY COALESCE(v.viewers, 0) DESC
       `)
       .all(cutoff) as unknown as Array<Record<string, unknown>>;
@@ -553,10 +603,17 @@ export class YoutubeRepo {
     const cutoff = new Date(Date.now() - API_DATA_MAX_AGE_MS).toISOString();
     const v1 = this.db
       .prepare(`
-        DELETE FROM yt_videos WHERE feed_seen_at < ?
-          OR yt_channel_id NOT IN (SELECT yt_channel_id FROM yt_links WHERE status IN ('auto', 'manual') AND yt_channel_id IS NOT NULL)
+        DELETE FROM yt_videos WHERE feed_seen_at < ? OR yt_channel_id NOT IN (${TRACKED_SQL})
       `)
       .run(cutoff);
+    // 노래: 추적하지 않는 채널, 30일 넘게 확인 못 한 것
+    const s1 = this.db
+      .prepare(`
+        DELETE FROM yt_songs WHERE yt_channel_id NOT IN (${TRACKED_SQL})
+          OR (checked_at IS NOT NULL AND checked_at < ?) OR (checked_at IS NULL AND first_seen_at < ?)
+      `)
+      .run(cutoff, cutoff);
+    this.db.prepare(`DELETE FROM yt_song_scans WHERE yt_channel_id NOT IN (${TRACKED_SQL})`).run();
     this.db
       .prepare(`
         UPDATE yt_videos SET detail_at = NULL, live_status = NULL, scheduled_at = NULL, live_started_at = NULL,
@@ -567,6 +624,434 @@ export class YoutubeRepo {
     const c1 = this.db
       .prepare(`UPDATE yt_channels SET handle = NULL, thumbnail_url = NULL, fetched_at = NULL WHERE fetched_at IS NOT NULL AND fetched_at < ?`)
       .run(cutoff);
-    return { videos: Number(v1.changes), channels: Number(c1.changes) };
+    return { videos: Number(v1.changes) + Number(s1.changes), channels: Number(c1.changes) };
+  }
+
+  // ---------------------------------------------------------------- 유튜브 전용 버튜버
+
+  private toVtuber(r: Record<string, unknown>): YtVtuber {
+    return {
+      ytChannelId: r.yt_channel_id as string,
+      name: r.name as string,
+      aliases: parseJson<string[]>(r.aliases, []),
+      group: str(r.grp),
+      region: r.region === "foreign" ? "foreign" : "ko",
+      status: r.status as YtVtuber["status"],
+      source: r.source as string,
+      note: str(r.note),
+      addedAt: r.added_at as string,
+      updatedAt: r.updated_at as string,
+      active: Number(r.active ?? 1) === 1,
+    };
+  }
+
+  /** 유튜브 전용 버튜버. 기본은 보이는 것만 (차단·치지직/SOOP 버튜버의 공식 채널로 연결된 것 제외) */
+  listVtubers(opts: { all?: boolean } = {}): YtVtuber[] {
+    const rows = this.db
+      .prepare(`SELECT v.*, (${ACTIVE_VT_SQL}) AS active FROM yt_vtubers v ${opts.all ? "" : `WHERE ${ACTIVE_VT_SQL}`} ORDER BY v.added_at`)
+      .all() as unknown as Array<Record<string, unknown>>;
+    return rows.map((r) => this.toVtuber(r));
+  }
+
+  getVtuber(ytChannelId: string): YtVtuber | null {
+    const r = this.db
+      .prepare(`SELECT v.*, (${ACTIVE_VT_SQL}) AS active FROM yt_vtubers v WHERE v.yt_channel_id = ?`)
+      .get(ytChannelId) as Record<string, unknown> | undefined;
+    return r ? this.toVtuber(r) : null;
+  }
+
+  /** 이 유튜브 채널이 치지직·SOOP 버튜버의 공식 채널로 연결돼 있는지 */
+  isLinkedToStreamer(ytChannelId: string): boolean {
+    return !!this.db
+      .prepare(`SELECT 1 FROM yt_links WHERE yt_channel_id = ? AND status IN ('auto', 'manual') LIMIT 1`)
+      .get(ytChannelId);
+  }
+
+  /**
+   * 유튜브 전용 버튜버 저장. 자동(auto)은 운영자가 정한 것(manual·blocked)을 덮어쓰지 않는다 (별칭만 더함).
+   * 새로 추가됐으면 true
+   */
+  saveVtuber(v: {
+    ytChannelId: string;
+    name: string;
+    aliases: string[];
+    group: string | null;
+    region: YtVtuber["region"];
+    status: YtVtuber["status"];
+    source: string;
+    note?: string | null;
+  }): boolean {
+    const now = new Date().toISOString();
+    const cur = this.getVtuber(v.ytChannelId);
+    const name = v.status === "auto" && cur ? cur.name : v.name;
+    const aliases = [...new Set([...(cur?.aliases ?? []), ...v.aliases, ...(cur && cur.name !== name ? [cur.name] : []), ...(v.name !== name ? [v.name] : [])]
+      .map((a) => a.trim())
+      .filter((a) => a && a !== name))].slice(0, 12);
+    if (cur && v.status === "auto" && cur.status !== "auto") {
+      this.db.prepare(`UPDATE yt_vtubers SET aliases = ? WHERE yt_channel_id = ?`).run(JSON.stringify(aliases), v.ytChannelId);
+      return false;
+    }
+    this.db
+      .prepare(`
+        INSERT INTO yt_vtubers (yt_channel_id, name, aliases, grp, region, status, source, note, added_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(yt_channel_id) DO UPDATE SET
+          name = excluded.name, aliases = excluded.aliases, grp = COALESCE(excluded.grp, grp), region = excluded.region,
+          status = excluded.status, source = CASE WHEN excluded.status = 'auto' THEN source ELSE excluded.source END,
+          note = COALESCE(excluded.note, note), updated_at = excluded.updated_at
+      `)
+      .run(v.ytChannelId, name, JSON.stringify(aliases), v.group, v.region, v.status, v.source, v.note ?? null, now, now);
+    return !cur;
+  }
+
+  setVtuberStatus(ytChannelId: string, status: YtVtuber["status"], note: string | null): boolean {
+    const res = this.db
+      .prepare(`UPDATE yt_vtubers SET status = ?, note = ?, updated_at = ? WHERE yt_channel_id = ?`)
+      .run(status, note, new Date().toISOString(), ytChannelId);
+    return Number(res.changes) > 0;
+  }
+
+  /** 확인 대기열에 넣기 (@핸들·UC…). 이미 있거나 이미 등록된 채널이면 무시. 넣었으면 true */
+  queueVtuber(q: { ref: string; name: string; aliases: string[]; group: string | null; region: YtVtuber["region"]; source: string }): boolean {
+    const ref = q.ref.startsWith("@") ? q.ref.toLowerCase() : q.ref;
+    if (ref.startsWith("UC") && this.getVtuber(ref)) return false;
+    const res = this.db
+      .prepare(`INSERT OR IGNORE INTO yt_vtuber_queue (ref, name, aliases, grp, region, source, added_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(ref, q.name, JSON.stringify(q.aliases), q.group, q.region, q.source, new Date().toISOString());
+    return Number(res.changes) > 0;
+  }
+
+  listQueue(limit = 100): YtVtuberQueued[] {
+    const rows = this.db
+      .prepare(`SELECT * FROM yt_vtuber_queue ORDER BY tries, added_at LIMIT ?`)
+      .all(limit) as unknown as Array<Record<string, unknown>>;
+    return rows.map((r) => ({
+      ref: r.ref as string,
+      name: r.name as string,
+      aliases: parseJson<string[]>(r.aliases, []),
+      group: str(r.grp),
+      region: r.region === "foreign" ? "foreign" : "ko",
+      source: r.source as string,
+      addedAt: r.added_at as string,
+      tries: Number(r.tries),
+      lastError: str(r.last_error),
+    }));
+  }
+
+  /** 대기열 처리 결과: 끝났으면(등록·제외) 지우고, 다시 해 볼 것은 횟수·사유만 남김 (3번 실패하면 지움) */
+  finishQueued(ref: string, retryError: string | null): void {
+    if (retryError === null) {
+      this.db.prepare(`DELETE FROM yt_vtuber_queue WHERE ref = ?`).run(ref);
+      return;
+    }
+    this.db.prepare(`UPDATE yt_vtuber_queue SET tries = tries + 1, last_error = ? WHERE ref = ?`).run(retryError, ref);
+    this.db.prepare(`DELETE FROM yt_vtuber_queue WHERE ref = ? AND tries >= 3`).run(ref);
+  }
+
+  /** 유튜브 채널 → 버모아 버튜버 (치지직·SOOP 주 채널 연결 우선, 없으면 유튜브 전용 버튜버) */
+  ownerMap(): Map<string, VtuberOwner> {
+    const out = new Map<string, VtuberOwner>();
+    const links = this.db
+      .prepare(`
+        SELECT yt_channel_id, platform, channel_id, name FROM yt_links
+        WHERE status IN ('auto', 'manual') AND yt_channel_id IS NOT NULL ORDER BY status = 'manual' DESC, updated_at
+      `)
+      .all() as unknown as Array<{ yt_channel_id: string; platform: Platform; channel_id: string; name: string }>;
+    for (const l of links) {
+      if (!out.has(l.yt_channel_id)) {
+        out.set(l.yt_channel_id, { platform: l.platform, channelId: l.channel_id, name: l.name, ytOnly: false, region: "ko" });
+      }
+    }
+    for (const v of this.listVtubers()) {
+      if (!out.has(v.ytChannelId)) {
+        out.set(v.ytChannelId, { platform: "youtube", channelId: v.ytChannelId, name: v.name, ytOnly: true, region: v.region });
+      }
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------- 노래 (커버·오리지널)
+
+  /** 노래 후보 넣기 (이미 있으면 무시). 넣은 수 */
+  addSongCandidates(
+    ytChannelId: string,
+    rows: { videoId: string; title: string; publishedAt: string; kind: SongKind }[],
+    source: "rss" | "uploads",
+  ): number {
+    if (rows.length === 0) return 0;
+    const now = new Date().toISOString();
+    const ins = this.db.prepare(`
+      INSERT OR IGNORE INTO yt_songs (video_id, yt_channel_id, title, published_at, kind, state, source, first_seen_at)
+      VALUES (?, ?, ?, ?, ?, 'new', ?, ?)
+    `);
+    let n = 0;
+    this.db.exec("BEGIN");
+    try {
+      for (const r of rows) n += Number(ins.run(r.videoId, ytChannelId, r.title, r.publishedAt, r.kind, source, now).changes);
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+    return n;
+  }
+
+  /** videos.list 로 확인할 노래: 새 후보 → 예정·방송 중이던 것(waitAgeMs 마다) → 오래된 것(30일 전에 갱신) */
+  songsToCheck(limit: number, refreshAgeMs: number, waitAgeMs = 6 * 3_600_000): string[] {
+    const now = Date.now();
+    const rows = this.db
+      .prepare(`
+        SELECT video_id FROM yt_songs
+        WHERE state = 'new' OR (state = 'wait' AND checked_at < ?) OR (state = 'ok' AND checked_at < ?)
+        ORDER BY state = 'new' DESC, checked_at LIMIT ?
+      `)
+      .all(new Date(now - waitAgeMs).toISOString(), new Date(now - refreshAgeMs).toISOString(), limit) as unknown as Array<{
+      video_id: string;
+    }>;
+    return rows.map((r) => r.video_id);
+  }
+
+  /**
+   * 확인 결과 저장. results 에 없는 영상(노래가 아님·길이 밖·삭제·비공개)은 지운다.
+   * 제목은 API 의 최신 값으로 바꾼다 (정책: 화면에는 최신 값).
+   */
+  saveSongChecks(
+    requested: string[],
+    results: { videoId: string; title: string; durationSec: number | null; state: "ok" | "wait"; kind: SongKind }[],
+  ): { kept: number; removed: number } {
+    const now = new Date().toISOString();
+    const got = new Map(results.map((r) => [r.videoId, r]));
+    const upd = this.db.prepare(`UPDATE yt_songs SET title = ?, kind = ?, duration_sec = ?, state = ?, checked_at = ? WHERE video_id = ?`);
+    const del = this.db.prepare(`DELETE FROM yt_songs WHERE video_id = ?`);
+    let kept = 0;
+    let removed = 0;
+    this.db.exec("BEGIN");
+    try {
+      for (const id of requested) {
+        const r = got.get(id);
+        if (r) {
+          upd.run(r.title, r.kind, r.durationSec, r.state, now, id);
+          kept++;
+        } else {
+          del.run(id);
+          removed++;
+        }
+      }
+      this.db.exec("COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+    return { kept, removed };
+  }
+
+  private toSong(r: Record<string, unknown>): YtSong {
+    return {
+      videoId: r.video_id as string,
+      ytChannelId: r.yt_channel_id as string,
+      title: r.title as string,
+      publishedAt: r.published_at as string,
+      kind: r.kind as SongKind,
+      durationSec: num(r.duration_sec),
+    };
+  }
+
+  /**
+   * 보이는 노래 (확인된 것만, 새것부터).
+   * ytChannelIds: 그 채널만 · q: 제목 검색 (orYtChannelIds = 버튜버 이름으로 찾은 채널도 포함)
+   */
+  listSongs(opts: {
+    kind?: SongKind;
+    ytChannelIds?: string[];
+    q?: string;
+    orYtChannelIds?: string[];
+    limit: number;
+    offset: number;
+  }): { total: number; songs: YtSong[] } {
+    const conds = [`s.state = 'ok'`, `s.yt_channel_id IN (${TRACKED_SQL})`];
+    const args: (string | number)[] = [];
+    if (opts.kind) {
+      conds.push(`s.kind = ?`);
+      args.push(opts.kind);
+    }
+    if (opts.ytChannelIds) {
+      if (opts.ytChannelIds.length === 0) return { total: 0, songs: [] };
+      conds.push(`s.yt_channel_id IN (${opts.ytChannelIds.map(() => "?").join(",")})`);
+      args.push(...opts.ytChannelIds);
+    }
+    if (opts.q) {
+      const like = `%${opts.q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+      const ors = [`s.title LIKE ? ESCAPE '\\'`];
+      args.push(like);
+      if (opts.orYtChannelIds?.length) {
+        ors.push(`s.yt_channel_id IN (${opts.orYtChannelIds.map(() => "?").join(",")})`);
+        args.push(...opts.orYtChannelIds);
+      }
+      conds.push(`(${ors.join(" OR ")})`);
+    }
+    const where = conds.join(" AND ");
+    const total = Number((this.db.prepare(`SELECT COUNT(*) AS n FROM yt_songs s WHERE ${where}`).get(...args) as { n: number }).n);
+    const rows = this.db
+      .prepare(`SELECT s.* FROM yt_songs s WHERE ${where} ORDER BY s.published_at DESC LIMIT ? OFFSET ?`)
+      .all(...args, opts.limit, opts.offset) as unknown as Array<Record<string, unknown>>;
+    return { total, songs: rows.map((r) => this.toSong(r)) };
+  }
+
+  /** 채널의 노래 수 (커버·오리지널) */
+  songCounts(ytChannelId: string): { cover: number; original: number } {
+    const rows = this.db
+      .prepare(`SELECT kind, COUNT(*) AS n FROM yt_songs WHERE yt_channel_id = ? AND state = 'ok' GROUP BY kind`)
+      .all(ytChannelId) as unknown as Array<{ kind: string; n: number }>;
+    const m = new Map(rows.map((r) => [r.kind, Number(r.n)]));
+    return { cover: m.get("cover") ?? 0, original: m.get("original") ?? 0 };
+  }
+
+  /** 노래 수집 상태 (운영) */
+  songStatus(): { channels: number; songs: number; cover: number; original: number; pending: number; scanned: number; scanning: number } {
+    const a = this.db
+      .prepare(`
+        SELECT COUNT(DISTINCT yt_channel_id) AS c, COUNT(*) AS n,
+          SUM(CASE WHEN kind = 'cover' THEN 1 ELSE 0 END) AS cv
+        FROM yt_songs WHERE state = 'ok'
+      `)
+      .get() as { c: number; n: number; cv: number | null };
+    const p = this.db.prepare(`SELECT COUNT(*) AS n FROM yt_songs WHERE state != 'ok'`).get() as { n: number };
+    const sc = this.db
+      .prepare(`SELECT SUM(full_done) AS d, SUM(CASE WHEN done_at IS NULL AND started_at IS NOT NULL THEN 1 ELSE 0 END) AS w FROM yt_song_scans`)
+      .get() as { d: number | null; w: number | null };
+    const cover = Number(a.cv ?? 0);
+    return {
+      channels: Number(a.c),
+      songs: Number(a.n),
+      cover,
+      original: Number(a.n) - cover,
+      pending: Number(p.n),
+      scanned: Number(sc.d ?? 0),
+      scanning: Number(sc.w ?? 0),
+    };
+  }
+
+  /**
+   * 업로드 목록을 훑을 채널: 진행 중 → 한 번도 안 훑은 채널 → 끝난 지 rescanAfterMs 지난 채널(앞쪽 몇 쪽만).
+   * pagesLeft = 이번 훑기에서 더 볼 수 있는 쪽 수
+   */
+  songScanTargets(
+    ids: string[],
+    fullPages: number,
+    rescanPages: number,
+    rescanAfterMs: number,
+    limit: number,
+  ): { ytChannelId: string; pageToken: string | null; pagesLeft: number; startNew: boolean; full: boolean }[] {
+    const rows = this.db.prepare(`SELECT * FROM yt_song_scans`).all() as unknown as Array<Record<string, unknown>>;
+    const st = new Map(rows.map((r) => [r.yt_channel_id as string, r]));
+    const now = Date.now();
+    type T = { ytChannelId: string; pageToken: string | null; pagesLeft: number; startNew: boolean; full: boolean };
+    const active: T[] = [];
+    const fresh: T[] = [];
+    const again: (T & { at: number })[] = [];
+    for (const id of ids) {
+      const r = st.get(id);
+      if (!r || !r.started_at) {
+        fresh.push({ ytChannelId: id, pageToken: null, pagesLeft: fullPages, startNew: true, full: true });
+      } else if (!r.done_at) {
+        const limitPages = Number(r.page_limit);
+        active.push({
+          ytChannelId: id,
+          pageToken: str(r.page_token),
+          pagesLeft: Math.max(1, limitPages - Number(r.pages)),
+          startNew: false,
+          full: limitPages >= fullPages,
+        });
+      } else {
+        const at = Date.parse(r.done_at as string) || 0;
+        if (now - at >= rescanAfterMs) {
+          const full = !Number(r.full_done);
+          again.push({ ytChannelId: id, pageToken: null, pagesLeft: full ? fullPages : rescanPages, startNew: true, full, at });
+        }
+      }
+    }
+    again.sort((a, b) => a.at - b.at);
+    return [...active, ...fresh, ...again.map(({ at: _at, ...t }) => t)].slice(0, limit);
+  }
+
+  /** 훑기 한 쪽 저장. done = 끝(다음 쪽 없음·쪽 수 다 씀), full = 전체 훑기였는지 */
+  saveSongScanPage(ytChannelId: string, startNew: boolean, pageLimit: number, nextToken: string | null, done: boolean, full: boolean): void {
+    const now = new Date().toISOString();
+    if (startNew) {
+      this.db
+        .prepare(`
+          INSERT INTO yt_song_scans (yt_channel_id, page_token, pages, page_limit, started_at, done_at) VALUES (?, NULL, 0, ?, ?, NULL)
+          ON CONFLICT(yt_channel_id) DO UPDATE SET
+            page_token = NULL, pages = 0, page_limit = excluded.page_limit, started_at = excluded.started_at, done_at = NULL
+        `)
+        .run(ytChannelId, pageLimit, now);
+    }
+    this.db
+      .prepare(`
+        UPDATE yt_song_scans SET pages = pages + 1, page_token = ?, done_at = ?,
+          full_done = CASE WHEN ? = 1 THEN 1 ELSE full_done END
+        WHERE yt_channel_id = ?
+      `)
+      .run(done ? null : nextToken, done ? now : null, done && full ? 1 : 0, ytChannelId);
   }
 }
+
+/** 수집 대상 유튜브 채널 (공식 채널 매핑 + 유튜브 전용 버튜버) */
+const TRACKED_SQL = `
+  SELECT yt_channel_id AS id FROM yt_links WHERE status IN ('auto', 'manual') AND yt_channel_id IS NOT NULL
+  UNION SELECT yt_channel_id AS id FROM yt_vtubers WHERE status != 'blocked'`;
+
+/** 보이는 유튜브 전용 버튜버 조건 (v = yt_vtubers): 차단되지 않았고 치지직·SOOP 버튜버의 공식 채널로 연결되지 않음 */
+const ACTIVE_VT_SQL = `v.status != 'blocked' AND NOT EXISTS (SELECT 1 FROM yt_links l WHERE l.yt_channel_id = v.yt_channel_id AND l.status IN ('auto', 'manual'))`;
+
+export type SongKind = "cover" | "original";
+
+export interface YtSong {
+  videoId: string;
+  ytChannelId: string;
+  title: string;
+  publishedAt: string;
+  kind: SongKind;
+  durationSec: number | null;
+}
+
+/** 유튜브 전용 버튜버. status: auto(자동 수집) · manual(운영자 확인) · blocked(버튜버 아님·잘못 찾음) */
+export interface YtVtuber {
+  ytChannelId: string;
+  /** 한국어 표기 이름 */
+  name: string;
+  aliases: string[];
+  /** 소속(자유 글, 예: 홀로라이브) */
+  group: string | null;
+  /** ko = 한국어 버튜버(LIVE 목록에도), foreign = 해외(프로필·검색·키리누키·노래만) */
+  region: "ko" | "foreign";
+  status: "auto" | "manual" | "blocked";
+  source: string;
+  note: string | null;
+  addedAt: string;
+  updatedAt: string;
+  /** 보이는지 (차단·치지직/SOOP 공식 채널로 연결이면 false) */
+  active: boolean;
+}
+
+export interface YtVtuberQueued {
+  ref: string;
+  name: string;
+  aliases: string[];
+  group: string | null;
+  region: YtVtuber["region"];
+  source: string;
+  addedAt: string;
+  tries: number;
+  lastError: string | null;
+}
+
+/** 유튜브 채널의 주인 (버모아 버튜버) */
+export interface VtuberOwner {
+  platform: Platform;
+  channelId: string;
+  name: string;
+  ytOnly: boolean;
+  region: YtVtuber["region"];
+}
+

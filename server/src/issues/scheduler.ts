@@ -1,10 +1,12 @@
-// Claude(구독) 작업 스케줄러 — 이슈 수집(3시간) · 신규 데뷔 웹 수집(6시간) · 키리누키 분류(30분, 대기 클립이 있을 때만).
+// Claude(구독) 작업 스케줄러 — 이슈 수집(3시간) · 신규 데뷔 웹 수집(6시간) · 키리누키 분류(30분, 대기 클립이 있을 때만) · 유튜브 전용 버튜버 웹 수집(7일).
 // 마지막 실행 시각을 DB 에 남겨, 배포로 서버가 재시작돼도 주기를 지킨다. 두 작업은 동시에 돌리지 않는다.
 import type { SqliteStore } from "../store/sqlite";
 import { config } from "../config";
 import { collectIssues } from "./collector";
 import { collectDebuts } from "../debuts/collector";
 import { classifyClips } from "../clips/classify";
+import { discoverYoutubeVtubers } from "../youtube/vtubers";
+import { ytApiEnabled } from "../youtube/api";
 import { log } from "../log";
 
 const CHECK_EVERY_MS = 5 * 60_000;
@@ -68,6 +70,14 @@ export function startAiJobs(store: SqliteStore): void {
       enabled: config.clipsEnabled,
       intervalMs: Math.max(15, config.clipsClassifyIntervalMin) * 60_000,
       run: () => classifyClips(store),
+    },
+    {
+      key: "ytvtubers",
+      label: "유튜브 전용 버튜버 웹 수집",
+      // Claude(키리누키 분류와 같은 구독) + YouTube 키(채널 확인)가 있을 때
+      enabled: config.clipsEnabled && ytApiEnabled() && config.ytVtubersDiscoverDays > 0,
+      intervalMs: Math.max(1, config.ytVtubersDiscoverDays) * 86_400_000,
+      run: () => discoverYoutubeVtubers(store),
     },
   ];
   const on = jobs.filter((j) => j.enabled);

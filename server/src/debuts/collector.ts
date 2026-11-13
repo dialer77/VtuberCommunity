@@ -6,6 +6,7 @@ import { runClaudeJson } from "../issues/claude";
 import { config } from "../config";
 import { log } from "../log";
 import { AGENCY_TAGS } from "../vtuber";
+import { queueYoutubeVtuber } from "../youtube/vtubers";
 
 interface RawDebut {
   name: string;
@@ -194,6 +195,11 @@ export async function collectDebuts(store: SqliteStore): Promise<DebutCollectSum
     if (ch && (ch.platform === "chzzk" || ch.platform === "soop")) {
       if (store.addRegistry({ platform: ch.platform, channelId: ch.channelId, name }, "web-debut")) {
         summary.registered.push(`${name} (${ch.platform})`);
+      }
+    } else if (ch?.platform === "youtube") {
+      // 유튜브에서 데뷔한 버튜버 → 유튜브 전용 버튜버 후보 (채널 확인은 유튜브 연동 주기 작업)
+      if (queueYoutubeVtuber(store, { url: ch.url, name, group: rep.agency, region: "ko", source: "web-debut" }) === "queued") {
+        summary.registered.push(`${name} (youtube)`);
       }
     }
   }
