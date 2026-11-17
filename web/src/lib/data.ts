@@ -22,6 +22,8 @@ import type {
   ClipTagCount,
   SearchResponse,
   Song,
+  CalendarMonth,
+  CalendarEvent,
 } from "@/types";
 import {
   fetchLivesFromBackend,
@@ -40,6 +42,8 @@ import {
   fetchClip,
   fetchSearch,
   fetchSongs,
+  fetchCalendar,
+  fetchUpcomingEvents,
 } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
@@ -226,6 +230,22 @@ export async function getIssueSlugs(): Promise<string[]> {
 }
 
 // ---- 키리누키 (백엔드 없으면 빈 목록)
+
+export async function getCalendar(month: string): Promise<CalendarMonth | null> {
+  try {
+    return await fetchCalendar(month);
+  } catch {
+    return null;
+  }
+}
+
+export async function getUpcomingEvents(days: number): Promise<{ today: string; events: CalendarEvent[] }> {
+  try {
+    return await fetchUpcomingEvents(days);
+  } catch {
+    return { today: "", events: [] };
+  }
+}
 
 export async function getSongs(q: Parameters<typeof fetchSongs>[0]): Promise<{ total: number; songs: Song[] }> {
   try {

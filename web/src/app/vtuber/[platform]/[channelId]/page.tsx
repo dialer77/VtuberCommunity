@@ -10,7 +10,7 @@ import { YoutubeLiveBox, YoutubeVideos } from "@/components/youtube-videos";
 import { ClipGrid, ClipNotice, ClipTagChip } from "@/components/clip-card";
 import { PlayAllSongs, SongGrid, SongNotice } from "@/components/song-card";
 import { isIndexableProfile, profileDescription, profileTopics } from "@/lib/seo";
-import { PLATFORMS } from "@/types";
+import { PLATFORMS, type ChannelProfile } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -131,6 +131,7 @@ export default async function VtuberProfilePage({
                 ))}
               </div>
             ) : null}
+            {p.facts ? <FactsLine facts={p.facts} /> : null}
             {topics.length > 0 ? (
               <p className="mt-1.5 text-xs text-muted-2">
                 주로 하는 방송{" "}
@@ -364,6 +365,30 @@ export default async function VtuberProfilePage({
       </section>
       )}
     </div>
+  );
+}
+
+/** 생일·데뷔일 + 가까운 기념일 (30일 안이면 D-day) */
+function FactsLine({ facts }: { facts: NonNullable<ChannelProfile["facts"]> }) {
+  const md = (s: string) => `${Number(s.slice(0, 2))}월 ${Number(s.slice(3))}일`;
+  const next = facts.next && facts.next.dDay <= 30 ? facts.next : null;
+  return (
+    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted">
+      {facts.birthday ? <span>🎂 생일 {md(facts.birthday)}</span> : null}
+      {facts.debutDate ? (
+        <span>
+          🌱 {Number(facts.debutDate.slice(0, 4))}년 {md(facts.debutDate.slice(5))} 데뷔
+        </span>
+      ) : null}
+      {next ? (
+        <Link
+          href={`/calendar?month=${next.date.slice(0, 7)}`}
+          className="rounded-full bg-accent/10 px-1.5 py-0.5 font-semibold text-accent hover:bg-accent/20"
+        >
+          {next.label} {next.dDay === 0 ? "오늘!" : `D-${next.dDay}`}
+        </Link>
+      ) : null}
+    </p>
   );
 }
 

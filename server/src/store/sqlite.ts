@@ -6,6 +6,7 @@ import type { LiveSnapshot, Platform } from "../domain";
 import { hasDebutSignal } from "../detect/debut";
 import { YoutubeRepo } from "../youtube/store";
 import { ClipRepo } from "../clips/store";
+import { FactsRepo } from "../calendar/store";
 
 /** API가 반환하는 라이브 아이템 (웹 LiveStream 매핑이 쉬운 형태) */
 export interface LiveItem {
@@ -233,6 +234,8 @@ export class SqliteStore implements Store {
   readonly youtube: YoutubeRepo;
   /** 키리누키 (같은 DB 파일) */
   readonly clips: ClipRepo;
+  /** 기념일 재료 — 생일·데뷔일 (같은 DB 파일) */
+  readonly facts: FactsRepo;
 
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
@@ -241,6 +244,7 @@ export class SqliteStore implements Store {
     this.migrate();
     this.youtube = new YoutubeRepo(this.db);
     this.clips = new ClipRepo(this.db);
+    this.facts = new FactsRepo(this.db);
   }
 
   private migrate(): void {

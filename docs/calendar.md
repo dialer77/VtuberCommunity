@@ -1,0 +1,53 @@
+# 기념일 캘린더 (생일·데뷔 기념일)
+
+버튜버 생일, 데뷔 n주년·n일, 데뷔 예정, 새 오리지널곡을 날짜별로 보여 줍니다. 2026-11-17 추가.
+
+| 화면 | 내용 |
+| --- | --- |
+| `/calendar` | 한 달 달력(넓은 화면) · 날짜별 목록(좁은 화면). 종류 거르기(생일·데뷔 기념일·데뷔 예정·오리지널곡), 이전·다음 달 |
+| 홈 "다가오는 기념일" | 오늘부터 7일 (노래 공개는 빼고 사람 기념일만) |
+| 프로필 머리 | 🎂 생일 · 🌱 데뷔일, 30일 안의 기념일은 D-day. 검색 설명문에도 생일·데뷔일 |
+
+## 재료
+
+| 재료 | 어디서 |
+| --- | --- |
+| 생일(월-일)·데뷔일 | **웹 수집** — Claude(구독, 웹 검색)가 공식 프로필·위키·기사에서 찾음. 출처 없는 값은 버림 |
+| 데뷔일 (웹 수집으로 못 찾았을 때) | 신규 데뷔 웹 수집(`debut_reports`)의 데뷔 완료 기록 |
+| 데뷔 예정 | 신규 데뷔 웹 수집의 예정 기록 (채널을 알면 프로필로 연결) |
+| 오리지널곡 공개 | 공식 채널 노래 모음(`yt_songs`)의 오리지널곡, 올라온 날 (`docs/youtube-api.md` 6장) |
+
+- 데뷔 n일은 데뷔한 날을 1일로 셉니다 (100일 = 데뷔일 + 99일). 100·500·1,000·2,000·3,000일만.
+- 2월 29일 생일·데뷔일은 윤년이 아닌 해에는 2월 28일에 표시합니다.
+- 생일은 캐릭터(활동) 공식 생일의 월·일만 받습니다. 실제 생년·나이·실명 같은 사적인 정보는 받지 않습니다.
+
+## 웹 수집
+
+| 항목 | 값 |
+| --- | --- |
+| 대상 | 월간 시청시간 상위 `FACTS_TOP`(300) → 유튜브 전용 버튜버 → 확정 목록 |
+| 주기 | `FACTS_INTERVAL_MIN`(720 = 12시간)마다 `FACTS_BATCH`(20)명. 찾을 사람이 없으면 Claude 를 부르지 않음 |
+| 다시 찾기 | 둘 다 못 찾음 → 60일 뒤, 하나만 찾음 → 180일 뒤, 둘 다 찾음 → 다시 안 찾음 |
+| 켜는 조건 | `FACTS_ENABLED=1` (기본은 `CLIPS_ENABLED`·`ISSUES_ENABLED` 를 따라감 — Claude 를 쓰는 기능이 켜져 있으면) |
+
+개발 PC 시험(2026-11-17): 운영 상위 버튜버 14명 + 유튜브 전용 2명 → 101초, 생일 15명·데뷔일 16명. 출처는 대부분 나무위키.
+
+YouTube API 는 쓰지 않습니다 (할당량 0).
+
+## 관리 (배포 PC)
+
+```powershell
+cd D:\01_Project\21_VtuberCommunity
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 status                      # 찾은 수 · 남은 대상 · 마지막 수집
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 list found 50               # 찾은 것 (최근 바뀐 순)
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 list missing 50             # 못 찾은 것 (상위부터)
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 show "버튜버 이름"            # 값과 출처
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 set "버튜버 이름" birthday 03-05      # 생일 고치기 (none = 없음으로 확정)
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 set "버튜버 이름" debut 2023-04-01    # 데뷔일 고치기 (none = 없음으로 확정)
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 auto "버튜버 이름"            # 운영자 입력 해제 → 다시 자동으로
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 run 20                      # 지금 바로 웹 수집 (Claude, 2~5분)
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 month 2026-12               # 그 달의 기념일
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 upcoming 14                 # 오늘부터 다가오는 기념일
+```
+
+운영자가 정한 값은 웹 수집이 덮어쓰지 않습니다. 이름이 여럿이면 `chzzk:<채널ID>` · `soop:<아이디>` · `youtube:UC…` 로 적습니다.

@@ -13,6 +13,7 @@ import {
 import { curatedProfile } from "./profiles";
 import { searchChannels } from "./search";
 import { listSongsOut, songsForProfile, youtubeForProfile, youtubeLiveItems, ytOnlyProfile } from "./youtube/view";
+import { calendarMonth, factsForProfile, upcomingEvents } from "./calendar/view";
 import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
 import { BUNDLE_IDS, upNextFor } from "./clips/recommend";
 import { forYou } from "./clips/foryou";
@@ -308,6 +309,7 @@ export function buildApi(store: SqliteStore) {
         curated: curatedProfile(p.channelId),
         clips: clipsForProfile(store, "youtube", p.channelId),
         songs: songsForProfile(store, p.youtube),
+        facts: factsForProfile(store, "youtube", p.channelId),
       };
     }
     const profile = store.getChannelProfile(channelId);
@@ -324,7 +326,20 @@ export function buildApi(store: SqliteStore) {
       youtube,
       clips: clipsForProfile(store, profile.platform, profile.channelId),
       songs: songsForProfile(store, youtube),
+      facts: factsForProfile(store, profile.platform, profile.channelId),
     };
+  });
+
+  // 기념일 캘린더 — 한 달 (?month=YYYY-MM, 없으면 이번 달 KST)
+  app.get("/api/calendar", async (req) => {
+    const q = req.query as { month?: string };
+    return calendarMonth(store, typeof q.month === "string" ? q.month : "");
+  });
+
+  // 다가오는 기념일 (홈) — 오늘부터 ?days=7 일
+  app.get("/api/calendar/upcoming", async (req) => {
+    const q = req.query as { days?: string };
+    return upcomingEvents(store, Number(q.days) || 7);
   });
 
   // 공식 채널 노래 (커버·오리지널, 올린 날짜순). ?kind=cover|original &platform=&channelId= &q=제목·버튜버 이름 &limit=24&offset=0

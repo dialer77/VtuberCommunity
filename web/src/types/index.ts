@@ -242,6 +242,39 @@ export interface ChannelProfile {
   songs?: ProfileSongs | null;
   /** 유튜브 전용 버튜버 (치지직·SOOP 채널 없음)일 때만 */
   ytOnly?: { group: string | null; region: "ko" | "foreign"; aliases: string[]; verified: boolean } | null;
+  /** 생일·데뷔일 (모르면 null) */
+  facts?: ProfileFacts | null;
+}
+
+export interface ProfileFacts {
+  /** MM-DD */
+  birthday: string | null;
+  /** YYYY-MM-DD */
+  debutDate: string | null;
+  sources: { url: string; title: string }[];
+  /** 1년 안의 다음 기념일 (dDay 0 = 오늘) */
+  next: { date: string; label: string; dDay: number } | null;
+}
+
+export type CalendarEventType = "birthday" | "anniversary" | "days" | "debut" | "debut_upcoming" | "song";
+
+/** 기념일 캘린더의 일정 하나 (날짜는 KST) */
+export interface CalendarEvent {
+  date: string;
+  type: CalendarEventType;
+  label: string;
+  name: string;
+  vtuber: { platform: Platform; channelId: string } | null;
+  years?: number;
+  days?: number;
+  song?: { videoId: string; title: string };
+  agency?: string | null;
+}
+
+export interface CalendarMonth {
+  month: string;
+  today: string;
+  events: CalendarEvent[];
 }
 
 /** 공식 채널 노래 하나 — 제목에 커버·오리지널 표기가 있는 공식 영상 */

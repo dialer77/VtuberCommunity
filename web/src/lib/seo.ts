@@ -68,10 +68,28 @@ function clip(s: string, max: number): string {
 }
 
 /** 프로필 검색 결과 설명문 (방송 제목은 넣지 않는다 — 민감한 문구가 검색 결과에 그대로 나가지 않게) */
+/** "3월 5일" */
+function mdText(md: string): string {
+  return `${Number(md.slice(0, 2))}월 ${Number(md.slice(3))}일`;
+}
+
+/** "생일 3월 5일. 2023년 4월 1일 데뷔." */
+function factsText(p: ChannelProfile): string {
+  const f = p.facts;
+  if (!f) return "";
+  return [
+    f.birthday ? `생일 ${mdText(f.birthday)}.` : "",
+    f.debutDate ? `${Number(f.debutDate.slice(0, 4))}년 ${mdText(f.debutDate.slice(5))} 데뷔.` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export function profileDescription(p: ChannelProfile): string {
   if (p.ytOnly) {
     const parts = [
       `${p.name} — 유튜브에서 활동하는 버튜버${p.ytOnly.group ? `, ${p.ytOnly.group}` : ""}.`,
+      factsText(p),
       p.isLive ? "지금 유튜브에서 방송 중." : "",
       p.songs?.total ? `커버·오리지널 노래 ${p.songs.total}곡.` : "",
       p.clips?.total ? `키리누키 ${p.clips.total}개.` : "",
@@ -83,6 +101,7 @@ export function profileDescription(p: ChannelProfile): string {
   const topics = profileTopics(p.broadcasts, 3).map((t) => t.label);
   const parts = [
     `${p.name} — ${PLATFORMS[p.platform].label} 버튜버${agency ? `, ${agency} 소속` : ""}.`,
+    factsText(p),
     topics.length ? `주로 ${topics.join("·")} 방송.` : "",
     p.isLive ? "지금 방송 중." : p.broadcasts[0] ? `최근 방송 ${kstDay(p.broadcasts[0])}.` : "",
     `방송 기록 ${p.broadcastCount}회, 최고 동접 ${p.peakViewers.toLocaleString("ko-KR")}명.`,

@@ -21,6 +21,8 @@ import type {
   ClipTagCount,
   SearchResponse,
   Song,
+  CalendarMonth,
+  CalendarEvent,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -286,6 +288,20 @@ export async function fetchSitemapEntries(): Promise<{
   if (!res.ok) throw new Error(`backend /api/sitemap ${res.status}`);
   const json = (await res.json()) as { channels?: []; clips?: [] };
   return { channels: json.channels ?? [], clips: json.clips ?? [] };
+}
+
+/** 기념일 캘린더 한 달 (YYYY-MM, 비우면 이번 달) */
+export async function fetchCalendar(month: string): Promise<CalendarMonth> {
+  const res = await fetch(`${BASE}/api/calendar?month=${encodeURIComponent(month)}`, fetchInit());
+  if (!res.ok) throw new Error(`backend /api/calendar ${res.status}`);
+  return (await res.json()) as CalendarMonth;
+}
+
+/** 다가오는 기념일 (오늘부터 days 일) */
+export async function fetchUpcomingEvents(days: number): Promise<{ today: string; events: CalendarEvent[] }> {
+  const res = await fetch(`${BASE}/api/calendar/upcoming?days=${days}`, fetchInit());
+  if (!res.ok) throw new Error(`backend /api/calendar/upcoming ${res.status}`);
+  return (await res.json()) as { today: string; events: CalendarEvent[] };
 }
 
 /** 공식 채널 노래 (커버·오리지널, 올린 날짜순) */

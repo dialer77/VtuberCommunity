@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getLiveStreams, getSongs, getTags } from "@/lib/data";
+import { getLiveStreams, getSongs, getTags, getUpcomingEvents } from "@/lib/data";
+import { UpcomingEvents } from "@/components/calendar-events";
 import { SongGrid } from "@/components/song-card";
 import { LiveCard } from "@/components/live-card";
 import { Stat } from "@/components/stat";
@@ -17,7 +18,12 @@ export default async function HomePage({
   searchParams: Promise<{ tag?: string }>;
 }) {
   const { tag } = await searchParams;
-  const [lives, tags, newSongs] = await Promise.all([getLiveStreams(tag), getTags(), getSongs({ limit: 8 })]);
+  const [lives, tags, newSongs, upcoming] = await Promise.all([
+    getLiveStreams(tag),
+    getTags(),
+    getSongs({ limit: 8 }),
+    getUpcomingEvents(7),
+  ]);
   // 유튜브 시청자 수는 합산하지 않는다 (YouTube API 정책 — 여러 채널의 수치를 합치지 않음)
   const totalViewers = lives.reduce((s, l) => s + (l.platform === "youtube" ? 0 : l.viewers), 0);
   const hasYoutube = lives.some((l) => l.platform === "youtube");
@@ -64,6 +70,8 @@ export default async function HomePage({
           ))}
         </section>
       )}
+
+      {upcoming.events.length > 0 ? <UpcomingEvents events={upcoming.events} today={upcoming.today} /> : null}
 
       <AdSlot slot="home-mid" />
 

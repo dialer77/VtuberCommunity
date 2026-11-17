@@ -63,6 +63,14 @@ export const config = {
   /** 새 클립이 없을 때 예전 분류를 보강(대표 순간·주제 통일·사건)할 클립 수. 0 이면 보강 안 함 */
   clipsEnrichBatch: Number(process.env.CLIPS_ENRICH_BATCH ?? 80),
 
+  // ---- 기념일 캘린더: 버튜버 생일·데뷔일 웹 수집 (Claude) — docs/calendar.md
+  /** 켜기 (기본: 키리누키 분류와 같이 — Claude 를 쓰는 기능이 켜져 있으면) */
+  factsEnabled: (process.env.FACTS_ENABLED ?? process.env.CLIPS_ENABLED ?? process.env.ISSUES_ENABLED) === "1",
+  /** 수집 주기(분)·한 번에 찾을 버튜버 수·대상(월간 시청시간 상위 N + 유튜브 전용 + 확정 목록) */
+  factsIntervalMin: Number(process.env.FACTS_INTERVAL_MIN ?? 720),
+  factsBatch: Number(process.env.FACTS_BATCH ?? 20),
+  factsTop: Number(process.env.FACTS_TOP ?? 300),
+
   // ---- 이슈 자동 수집 (Claude Code 헤드리스 + 구독 인증) — docs/issue-collector.md
   /** 1 이면 주기적으로 이슈 수집 */
   issuesEnabled: process.env.ISSUES_ENABLED === "1",
