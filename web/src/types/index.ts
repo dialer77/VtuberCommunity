@@ -244,6 +244,16 @@ export interface ChannelProfile {
   ytOnly?: { group: string | null; region: "ko" | "foreign"; aliases: string[]; verified: boolean } | null;
   /** 생일·데뷔일 (모르면 null) */
   facts?: ProfileFacts | null;
+  /** 공식 SNS·커뮤니티·팬아트 태그 (없으면 null) */
+  social?: ProfileSocial | null;
+}
+
+export interface ProfileSocial {
+  links: { kind: string; label: string; url: string; handle?: string }[];
+  communities: { label: string; url: string }[];
+  hashtags: { tag: string; kind: "fanart" | "clip" | "stream" | "other"; searchUrl: string }[];
+  xHandle: string | null;
+  fromWeb: boolean;
 }
 
 export interface ProfileFacts {

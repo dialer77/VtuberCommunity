@@ -9,6 +9,7 @@ import { FavoriteButton } from "@/components/auth/favorite-button";
 import { YoutubeLiveBox, YoutubeVideos } from "@/components/youtube-videos";
 import { ClipGrid, ClipNotice, ClipTagChip } from "@/components/clip-card";
 import { PlayAllSongs, SongGrid, SongNotice } from "@/components/song-card";
+import { SocialLinksRow, SocialTab } from "@/components/profile-social";
 import { isIndexableProfile, profileDescription, profileTopics } from "@/lib/seo";
 import { PLATFORMS, type ChannelProfile } from "@/types";
 
@@ -53,12 +54,21 @@ export default async function VtuberProfilePage({
   const yt = p.youtube ?? null;
   const clips = p.clips ?? null;
   const songs = p.songs ?? null;
+  const social = p.social ?? null;
   // 유튜브 전용 버튜버는 방송 기록이 없다 → 공식 영상(또는 노래·키리누키)이 첫 탭
   const ytOnly = p.ytOnly ?? null;
-  type Tab = "history" | "videos" | "songs" | "clips";
+  type Tab = "history" | "videos" | "songs" | "clips" | "sns";
   const firstTab: Tab = ytOnly ? (yt ? "videos" : songs ? "songs" : "clips") : "history";
   const activeTab: Tab =
-    tab === "videos" && yt ? "videos" : tab === "songs" && songs ? "songs" : tab === "clips" && clips ? "clips" : firstTab;
+    tab === "videos" && yt
+      ? "videos"
+      : tab === "songs" && songs
+        ? "songs"
+        : tab === "clips" && clips
+          ? "clips"
+          : tab === "sns" && social
+            ? "sns"
+            : firstTab;
   const songKind = kind === "cover" || kind === "original" ? kind : undefined;
   const shownSongs = songs ? songs.songs.filter((s) => !songKind || s.kind === songKind) : [];
   const base = `/vtuber/${p.platform}/${p.channelId}`;
@@ -180,6 +190,7 @@ export default async function VtuberProfilePage({
             채널 방문 →
           </a>
         )}
+        {social ? <SocialLinksRow social={social} /> : null}
         {yt ? <YoutubeLiveBox yt={yt} /> : null}
       </header>
 
@@ -229,7 +240,7 @@ export default async function VtuberProfilePage({
       )}
 
       {/* 탭: 이전 방송 기록 · 공식 영상(유튜브 채널이 연결됐을 때) · 노래 · 키리누키(클립이 있을 때) */}
-      {yt || clips || songs ? (
+      {yt || clips || songs || social ? (
         <nav className="flex flex-wrap gap-2" aria-label="프로필 탭">
           {ytOnly ? null : <TabLink href={base} active={activeTab === "history"} label="이전 방송 기록" />}
           {yt ? (
@@ -245,12 +256,17 @@ export default async function VtuberProfilePage({
           {clips ? (
             <TabLink href={firstTab === "clips" ? base : `${base}?tab=clips`} active={activeTab === "clips"} label={`키리누키 ${clips.total}`} />
           ) : null}
+          {social ? <TabLink href={`${base}?tab=sns`} active={activeTab === "sns"} label="SNS·팬아트" /> : null}
         </nav>
       ) : null}
 
       {activeTab === "videos" && yt ? (
         <section className="flex flex-col gap-3" aria-label="공식 영상">
           <YoutubeVideos yt={yt} ytOnly={!!ytOnly} />
+        </section>
+      ) : activeTab === "sns" && social ? (
+        <section aria-label="SNS·팬아트">
+          <SocialTab social={social} name={p.name} />
         </section>
       ) : activeTab === "songs" && songs ? (
         <section className="flex flex-col gap-4" aria-label="노래">
@@ -332,7 +348,7 @@ export default async function VtuberProfilePage({
         </section>
       ) : (
       <section className="flex flex-col gap-3">
-        {yt || clips || songs ? null : <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>}
+        {yt || clips || songs || social ? null : <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>}
         {p.broadcasts.length === 0 ? (
           <p className="text-sm text-muted-2">아직 기록된 방송이 없어요.</p>
         ) : (

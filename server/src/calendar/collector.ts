@@ -1,12 +1,15 @@
 // 버튜버 생일·데뷔일 웹 수집: Claude(구독, 헤드리스, 웹 검색)가 공식 프로필·위키·기사에서 찾는다.
 // 대상: 월간 시청시간 상위 N(치지직·SOOP) → 유튜브 전용 버튜버 → 확정 목록. 한 번에 FACTS_BATCH 명, 아직 안 찾았거나 오래된 것만.
 // 생일은 캐릭터(활동) 공식 생일의 월·일만 받는다 (실제 생년·나이·실명 같은 사적인 정보는 받지 않음).
+// 같은 호출에서 공식 SNS 링크·팬아트 해시태그도 찾는다 (팬아트 자체는 옮기지 않고 태그로 원래 자리에 연결).
 import type { SqliteStore } from "../store/sqlite";
 import { channelUrl } from "../store/sqlite";
 import type { Platform } from "../domain";
 import { resolveChannelTags, tagById } from "../tags/catalog";
 import { runClaudeJson } from "../issues/claude";
 import { validBirthday, validDebutDate, type FactSource } from "./store";
+import { classifyLink, cleanHashtag } from "../social/links";
+import type { Hashtag, HashtagKind } from "../social/store";
 import { config } from "../config";
 import { log } from "../log";
 
@@ -37,7 +40,7 @@ export function factTargets(store: SqliteStore, opts: { all?: boolean } = {}): F
     const k = `${platform}:${channelId}`;
     if (seen.has(k)) return;
     seen.add(k);
-    if (!opts.all && !store.facts.isDue(platform, channelId)) return;
+    if (!opts.all && !store.facts.isDue(platform, channelId) && store.social.webChecked(platform, channelId)) return;
     const where = platform === "chzzk" ? "치지직" : platform === "soop" ? "SOOP" : "유튜브";
     out.push({ platform, channelId, name, hint: `${where} ${channelUrl(platform, channelId)}${group ? ` · 소속 ${group}` : ""}` });
   };
@@ -60,12 +63,22 @@ const SCHEMA = {
           n: { type: "integer", description: "목록 번호" },
           birthday: { type: "string", description: "캐릭터(활동) 공식 생일 MM-DD. 모르면 빈 문자열" },
           debutDate: { type: "string", description: "데뷔일(첫 방송·공식 데뷔) YYYY-MM-DD. 모르면 빈 문자열" },
+          links: { type: "array", items: { type: "string" }, description: "본인 공식 SNS·커뮤니티 주소 (X·인스타그램·틱톡·팬카페·디스코드·공식 사이트)" },
+          hashtags: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { tag: { type: "string" }, kind: { type: "string", enum: ["fanart", "clip", "stream", "other"] } },
+              required: ["tag", "kind"],
+            },
+            description: "본인이 정한 공식 해시태그 (fanart = 팬아트 태그, clip = 클립·짤 태그, stream = 방송 태그)",
+          },
           sources: {
             type: "array",
             items: { type: "object", properties: { url: { type: "string" }, title: { type: "string" } }, required: ["url"] },
           },
         },
-        required: ["n", "birthday", "debutDate", "sources"],
+        required: ["n", "birthday", "debutDate", "links", "hashtags", "sources"],
       },
     },
   },
@@ -79,6 +92,8 @@ function buildPrompt(targets: FactTarget[]): string {
 아래 버튜버마다 **생일**과 **데뷔일**을 웹 검색(WebSearch)과 페이지 확인(WebFetch)으로 찾는다.
 - birthday: 버튜버(캐릭터·활동)의 공식 생일, 월-일만 (MM-DD). 예: 03-05
 - debutDate: 버튜버로 데뷔(첫 방송·공식 데뷔)한 날 (YYYY-MM-DD). 예: 2023-04-01
+- links: **본인 공식** SNS·커뮤니티 주소 — X(트위터), 인스타그램, 틱톡, 네이버 팬카페, 디스코드, 공식 사이트. 팬 계정·클립 계정·소속사 공용 계정은 넣지 않는다
+- hashtags: 본인이 프로필·공지에 적어 둔 **공식 해시태그** — 팬아트 태그(fanart, 예: #리코아트), 클립·짤 태그(clip), 방송 태그(stream). 팬들이 임의로 쓰는 것은 넣지 않는다
 
 ## 규칙
 - 공식 프로필(소속사 사이트·방송국 소개·공식 SNS 프로필·공지), 나무위키 같은 정리 위키, 기사에서 **확인한 것만**. 추측·계산하지 말 것. 모르면 빈 문자열.
@@ -97,6 +112,8 @@ interface RawItem {
   n: number;
   birthday?: string;
   debutDate?: string;
+  links?: string[];
+  hashtags?: { tag: string; kind: string }[];
   sources?: { url: string; title?: string }[];
 }
 
@@ -104,6 +121,8 @@ export interface FactCollectSummary {
   checked: number;
   birthdays: number;
   debuts: number;
+  /** 팬아트 태그를 찾은 수 */
+  fanart: number;
   found: string[];
   durationMs: number;
 }
@@ -111,7 +130,7 @@ export interface FactCollectSummary {
 /** 웹 수집 1회 (대상이 없으면 Claude 를 부르지 않음) */
 export async function collectFacts(store: SqliteStore, limit = config.factsBatch): Promise<FactCollectSummary> {
   const targets = factTargets(store).slice(0, Math.max(1, limit));
-  const summary: FactCollectSummary = { checked: 0, birthdays: 0, debuts: 0, found: [], durationMs: 0 };
+  const summary: FactCollectSummary = { checked: 0, birthdays: 0, debuts: 0, fanart: 0, found: [], durationMs: 0 };
   if (targets.length === 0) return summary;
   log.info(`생일·데뷔일 수집 시작 — ${targets.length}명`);
   const res = await runClaudeJson<{ items: RawItem[] }>(buildPrompt(targets), SCHEMA, { tools: ["WebSearch", "WebFetch"] });
@@ -141,13 +160,24 @@ export async function collectFacts(store: SqliteStore, limit = config.factsBatch
       debutDate: ok ? debutDate : null,
       sources: ok ? sources : [],
     });
+    // 공식 SNS·해시태그 (주소·태그 모양만 확인. 출처가 없으면 버림)
+    const links = ok ? [...new Set((it?.links ?? []).map((u) => classifyLink(u)?.url).filter((u): u is string => !!u))] : [];
+    const kinds: HashtagKind[] = ["fanart", "clip", "stream", "other"];
+    const hashtags: Hashtag[] = ok
+      ? (it?.hashtags ?? []).flatMap((h) => {
+          const tag = cleanHashtag(h.tag ?? "");
+          return tag ? [{ tag, kind: kinds.includes(h.kind as HashtagKind) ? (h.kind as HashtagKind) : "other" }] : [];
+        })
+      : [];
+    store.social.saveWeb(t.platform, t.channelId, links, hashtags);
+    if (hashtags.some((h) => h.kind === "fanart")) summary.fanart++;
     summary.checked++;
     if (ok && birthday) summary.birthdays++;
     if (ok && debutDate) summary.debuts++;
     if (ok && (birthday || debutDate)) summary.found.push(`${t.name}${birthday ? ` 🎂${birthday}` : ""}${debutDate ? ` 🌱${debutDate}` : ""}`);
   });
   log.info(
-    `생일·데뷔일 수집 완료 — ${summary.checked}명 중 생일 ${summary.birthdays} · 데뷔일 ${summary.debuts} · ${Math.round(summary.durationMs / 1000)}초`,
+    `생일·데뷔일 수집 완료 — ${summary.checked}명 중 생일 ${summary.birthdays} · 데뷔일 ${summary.debuts} · 팬아트 태그 ${summary.fanart} · ${Math.round(summary.durationMs / 1000)}초`,
   );
   return summary;
 }

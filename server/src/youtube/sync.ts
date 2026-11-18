@@ -64,7 +64,9 @@ export interface MapResult {
 /** 한 채널의 유튜브 공식 채널 추정·저장 */
 export async function mapChannel(store: SqliteStore, t: MapTarget): Promise<MapResult> {
   const repo = store.youtube;
-  const links = (await fetchSocialLinks(t.platform, t.channelId)).map((l) => ({ ...l, from: t.platform }));
+  const raw = await fetchSocialLinks(t.platform, t.channelId);
+  store.social.savePlatformLinks(t.platform, t.channelId, raw);
+  const links = raw.map((l) => ({ ...l, from: t.platform }));
   const pick = pickYoutube(links, t.name);
   const checkedAt = new Date().toISOString();
 

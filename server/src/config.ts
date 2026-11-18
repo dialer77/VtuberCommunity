@@ -70,6 +70,8 @@ export const config = {
   factsIntervalMin: Number(process.env.FACTS_INTERVAL_MIN ?? 720),
   factsBatch: Number(process.env.FACTS_BATCH ?? 20),
   factsTop: Number(process.env.FACTS_TOP ?? 300),
+  /** 치지직·SOOP 채널 소개 링크 받기 (공개 정보, 키 필요 없음). 0 = 끔 */
+  socialSync: process.env.SOCIAL_SYNC !== "0",
 
   // ---- 이슈 자동 수집 (Claude Code 헤드리스 + 구독 인증) — docs/issue-collector.md
   /** 1 이면 주기적으로 이슈 수집 */

@@ -13,6 +13,7 @@ import { buildAgencyRoster, loadRosterSeed } from "./tags/roster";
 import { setAgencyRoster } from "./tags/catalog";
 import { startYoutubeSync } from "./youtube/sync";
 import { startClipSync } from "./clips/sync";
+import { startSocialSync } from "./social/sync";
 
 function makeStore(): Store {
   switch (config.storeKind) {
@@ -79,6 +80,8 @@ if (store instanceof SqliteStore) {
   startYoutubeSync(store);
   // 키리누키 채널 발견·RSS (CLIPS_ENABLED + YouTube 키). 분류는 위 Claude 작업
   startClipSync(store);
+  // 치지직·SOOP 채널 소개의 SNS 링크 (10분마다, SOCIAL_SYNC=0 이면 끔)
+  startSocialSync(store);
 }
 
 // 수집 스케줄러

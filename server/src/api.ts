@@ -14,6 +14,7 @@ import { curatedProfile } from "./profiles";
 import { searchChannels } from "./search";
 import { listSongsOut, songsForProfile, youtubeForProfile, youtubeLiveItems, ytOnlyProfile } from "./youtube/view";
 import { calendarMonth, factsForProfile, upcomingEvents } from "./calendar/view";
+import { socialForProfile } from "./social/view";
 import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
 import { BUNDLE_IDS, upNextFor } from "./clips/recommend";
 import { forYou } from "./clips/foryou";
@@ -310,6 +311,7 @@ export function buildApi(store: SqliteStore) {
         clips: clipsForProfile(store, "youtube", p.channelId),
         songs: songsForProfile(store, p.youtube),
         facts: factsForProfile(store, "youtube", p.channelId),
+        social: socialForProfile(store, "youtube", p.channelId, p.channelId),
       };
     }
     const profile = store.getChannelProfile(channelId);
@@ -327,6 +329,7 @@ export function buildApi(store: SqliteStore) {
       clips: clipsForProfile(store, profile.platform, profile.channelId),
       songs: songsForProfile(store, youtube),
       facts: factsForProfile(store, profile.platform, profile.channelId),
+      social: socialForProfile(store, profile.platform, profile.channelId, youtube?.ytChannelId ?? null),
     };
   });
 

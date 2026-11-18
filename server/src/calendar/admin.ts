@@ -8,6 +8,10 @@
 //   run [개수]                      지금 바로 웹 수집 (Claude)
 //   month [YYYY-MM]                 그 달의 기념일 목록
 //   upcoming [일수]                 오늘부터 다가오는 기념일
+//   links <대상>                    프로필에 보일 SNS 링크·커뮤니티·해시태그
+//   link-add <대상> <주소>          공식 SNS 링크 추가 · link-del <대상> <주소> 빼기
+//   tag-add <대상> <#태그> [fanart|clip|stream|other]   공식 해시태그 추가 (기본 fanart) · tag-del <대상> <#태그> 빼기
+//   social-auto <대상>              링크·태그 운영자 수정 해제 → 다음 수집 때 다시 찾음
 // <대상>: chzzk:<채널ID> · soop:<아이디> · youtube:UC… · 버튜버 이름
 import { SqliteStore } from "../store/sqlite";
 import { config } from "../config";
@@ -15,6 +19,10 @@ import type { Platform } from "../domain";
 import { validBirthday, validDebutDate, type VtuberFact } from "./store";
 import { collectFacts, factTargets } from "./collector";
 import { calendarMonth, kstToday, upcomingEvents, type CalendarEvent } from "./view";
+import { socialForProfile } from "../social/view";
+import { classifyLink, cleanHashtag } from "../social/links";
+import type { HashtagKind } from "../social/store";
+import { youtubeForProfile } from "../youtube/view";
 
 const [cmd = "status", arg1, arg2, arg3] = process.argv.slice(2);
 const store = new SqliteStore(config.dbPath);
@@ -81,6 +89,7 @@ switch (cmd) {
           enabled: config.factsEnabled,
           every: `${config.factsIntervalMin}분마다 ${config.factsBatch}명`,
           ...repo.counts(),
+          social: { ...store.social.webCounts(), platformLinks: store.social.platformLinkCount() },
           dueNow: due.length,
           lastRun: store.getMeta("facts_last_result") ? JSON.parse(store.getMeta("facts_last_result")!) : null,
           today: kstToday(),
@@ -152,8 +161,53 @@ switch (cmd) {
     for (const e of r.events) console.log(evLine(e));
     break;
   }
+  case "links": {
+    const t = resolveTarget(arg1);
+    const yt = youtubeForProfile(store, t.platform, t.channelId)?.ytChannelId ?? null;
+    const s = socialForProfile(store, t.platform, t.channelId, yt);
+    const web = store.social.web(t.platform, t.channelId);
+    console.log(`${t.name}  (${t.platform}:${t.channelId})${web?.manual ? " · 운영자 수정" : ""}`);
+    if (!s) {
+      console.log("   (링크·태그 없음)");
+      break;
+    }
+    for (const l of s.links) console.log(`   ${l.label.padEnd(6)} ${l.url}`);
+    for (const c of s.communities) console.log(`   ${c.label} ${c.url}`);
+    for (const h of s.hashtags) console.log(`   ${h.tag} (${h.kind})`);
+    break;
+  }
+  case "link-add":
+  case "link-del":
+  case "tag-add":
+  case "tag-del": {
+    const t = resolveTarget(arg1);
+    const cur = store.social.web(t.platform, t.channelId) ?? { links: [], hashtags: [], manual: false, checkedAt: "" };
+    let links = [...cur.links];
+    let tags = [...cur.hashtags];
+    if (cmd === "link-add" || cmd === "link-del") {
+      const l = classifyLink(arg2 ?? "");
+      if (!l) die("쓸 수 없는 주소예요 (https://… 공식 SNS·사이트 주소)");
+      links = links.filter((u) => classifyLink(u)?.url !== l.url);
+      if (cmd === "link-add") links.push(l.url);
+    } else {
+      const tag = cleanHashtag(arg2 ?? "");
+      if (!tag) die("해시태그를 적어 주세요 (예: #리코아트)");
+      tags = tags.filter((h) => h.tag.toLowerCase() !== tag.toLowerCase());
+      const kinds: HashtagKind[] = ["fanart", "clip", "stream", "other"];
+      if (cmd === "tag-add") tags.push({ tag, kind: kinds.includes(arg3 as HashtagKind) ? (arg3 as HashtagKind) : "fanart" });
+    }
+    store.social.setWebManual(t.platform, t.channelId, links, tags);
+    console.log(`저장 (운영자 수정): ${t.name} — 링크 ${links.length}개 · 태그 ${tags.map((h) => h.tag).join(" ") || "-"}`);
+    break;
+  }
+  case "social-auto": {
+    const t = resolveTarget(arg1);
+    store.social.clearWebManual(t.platform, t.channelId);
+    console.log(`링크·태그 운영자 수정 해제: ${t.name} — 다음 수집 때 다시 찾아요`);
+    break;
+  }
   default:
     console.log(
-      "사용법: status | list [found|missing] [개수] | show <대상> | set <대상> birthday <MM-DD|none> | set <대상> debut <YYYY-MM-DD|none> | auto <대상> | run [개수] | month [YYYY-MM] | upcoming [일수]",
+      "사용법: status | list [found|missing] [개수] | show <대상> | set <대상> birthday <MM-DD|none> | set <대상> debut <YYYY-MM-DD|none> | auto <대상> | run [개수] | month [YYYY-MM] | upcoming [일수] | links <대상> | link-add·link-del <대상> <주소> | tag-add <대상> <#태그> [종류] | tag-del <대상> <#태그> | social-auto <대상>",
     );
 }

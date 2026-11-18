@@ -11,6 +11,12 @@
     powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 month [2026-12]                  # 그 달의 기념일
     powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 upcoming [14]                    # 오늘부터 다가오는 기념일
 
+  공식 SNS 링크·팬아트 해시태그 (프로필 'SNS·팬아트' 탭)
+    ... calendar.ps1 links "버튜버 이름"                          # 프로필에 보일 링크·커뮤니티·태그
+    ... calendar.ps1 link-add "버튜버 이름" https://x.com/계정     # 공식 링크 추가 (link-del 로 빼기)
+    ... calendar.ps1 tag-add "버튜버 이름" "#리코아트" fanart       # 공식 해시태그 추가 (tag-del 로 빼기, 종류: fanart·clip·stream·other)
+    ... calendar.ps1 social-auto "버튜버 이름"                    # 링크·태그 수정 해제 → 다시 자동으로
+
   이름 대신 chzzk:<채널ID> · soop:<아이디> · youtube:UC… 로 적어도 된다 (같은 이름이 여럿일 때).
 #>
 param(

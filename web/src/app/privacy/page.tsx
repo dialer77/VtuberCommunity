@@ -95,6 +95,14 @@ export default function PrivacyPage() {
           </a>
           을 따릅니다. 유튜브 영상은 재생 버튼을 누르기 전까지 불러오지 않습니다.
         </p>
+        <p>
+          버튜버 프로필의 &lsquo;X 최근 게시물 불러오기&rsquo;를 누르면 X(구 트위터)의 공식 위젯을 불러오며, 이때 X 가 쿠키 등으로
+          정보를 수집할 수 있습니다 (
+          <a href="https://x.com/ko/privacy" target="_blank" rel="noopener noreferrer">
+            X 개인정보처리방침
+          </a>
+          ). 누르기 전에는 불러오지 않습니다. 팬아트·게시물은 버모아에 저장하지 않고 원래 있는 곳으로 연결합니다.
+        </p>
 
         <h2>5. 정보의 수정·삭제</h2>
         <p>

@@ -1,4 +1,4 @@
-# 기념일 캘린더 (생일·데뷔 기념일)
+# 기념일 캘린더 · 공식 SNS·팬아트 태그
 
 버튜버 생일, 데뷔 n주년·n일, 데뷔 예정, 새 오리지널곡을 날짜별로 보여 줍니다. 2026-11-17 추가.
 
@@ -34,6 +34,21 @@
 
 YouTube API 는 쓰지 않습니다 (할당량 0).
 
+## 공식 SNS·팬아트 태그 (2026-11-18)
+
+프로필 머리에 공식 SNS 줄, **SNS·팬아트** 탭에 공식 링크·커뮤니티 바로가기·팬아트 태그·X 최근 게시물을 모읍니다.
+
+| 재료 | 어디서 |
+| --- | --- |
+| 공식 SNS 링크 | 치지직 채널 정보의 `socialLinks`, SOOP 방송국 `link` (본인이 걸어 둔 링크). 10분마다 25명, 7일마다 다시 (`SOCIAL_SYNC=0` 이면 끔). 유튜브 매핑이 받을 때도 저장 |
+| 링크 보충·팬아트 태그 | 생일·데뷔일 웹 수집(Claude)이 같은 호출에서 본인 공식 SNS 주소와 **공식 해시태그**(팬아트·클립·방송)를 찾음 |
+| 커뮤니티 바로가기 | 유튜브 커뮤니티 탭(`/channel/UC…/posts`), 치지직 커뮤니티, 팬카페 — 정해진 주소 |
+| X 최근 게시물 | X 공식 타임라인 위젯. **누를 때만** 불러오고, 로그인하지 않은 방문자에게는 X 가 고른 인기 게시물이 보이거나 안 보일 수 있음 |
+
+- **팬아트·게시물은 옮겨 오지 않습니다.** 작가·버튜버의 저작물이고, X·인스타그램·커뮤니티 사이트는 긁어 오기를 약관으로 막고 있어서, 팬아트 태그를 누르면 X 의 그 태그 이미지 검색(로그인 필요)으로 연결합니다. 유튜브 커뮤니티 게시물은 API 가 없어 커뮤니티 탭으로 연결합니다.
+- 나중에 로그인·신고 도구가 갖춰지면 작가가 직접 자기 팬아트 게시물 주소를 올리고 공식 임베드로 보여 주는 방식을 검토합니다.
+- 개인정보처리방침 4항에 X 위젯 안내를 넣었습니다.
+
 ## 관리 (배포 PC)
 
 ```powershell
@@ -48,6 +63,13 @@ powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 auto "버�
 powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 run 20                      # 지금 바로 웹 수집 (Claude, 2~5분)
 powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 month 2026-12               # 그 달의 기념일
 powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 upcoming 14                 # 오늘부터 다가오는 기념일
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 links "버튜버 이름"                    # 프로필에 보일 링크·커뮤니티·태그
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 link-add "버튜버 이름" https://x.com/계정   # 공식 링크 추가 (link-del 로 빼기)
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 tag-add "버튜버 이름" "#리코아트" fanart     # 공식 해시태그 추가 (tag-del 로 빼기)
+powershell -ExecutionPolicy Bypass -File deploy\windows\calendar.ps1 social-auto "버튜버 이름"              # 링크·태그 수정 해제 → 다시 자동으로
 ```
 
 운영자가 정한 값은 웹 수집이 덮어쓰지 않습니다. 이름이 여럿이면 `chzzk:<채널ID>` · `soop:<아이디>` · `youtube:UC…` 로 적습니다.
