@@ -11,7 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 백엔드가 멈춰 있어도 사이트맵은 나가야 하므로 프로필·클립은 실패하면 뺀다
   const [issues, entries] = await Promise.all([
     getIssues(),
-    fetchSitemapEntries().catch(() => ({ channels: [], clips: [] })),
+    fetchSitemapEntries().catch(() => ({ channels: [], clips: [], topics: [] })),
   ]);
   const latestIssue = issues[0]?.publishedAt;
 
@@ -55,5 +55,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.4,
   }));
 
-  return [...staticRoutes, ...issueRoutes, ...profileRoutes, ...clipRoutes];
+  // 게임·사건 페이지 (클립 3개 이상)
+  const topicRoutes: MetadataRoute.Sitemap = entries.topics.map((t) => ({
+    url: `${SITE}/${t.kind}/${encodeURIComponent(t.name)}`,
+    ...(t.lastAt ? { lastModified: t.lastAt } : {}),
+    changeFrequency: "weekly",
+    priority: 0.5,
+  }));
+
+  return [...staticRoutes, ...issueRoutes, ...profileRoutes, ...topicRoutes, ...clipRoutes];
 }

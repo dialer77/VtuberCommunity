@@ -24,6 +24,8 @@ import type {
   Song,
   CalendarMonth,
   CalendarEvent,
+  EgoGraph,
+  TopicPage,
 } from "@/types";
 import {
   fetchLivesFromBackend,
@@ -44,6 +46,8 @@ import {
   fetchSongs,
   fetchCalendar,
   fetchUpcomingEvents,
+  fetchGraphNode,
+  fetchTopicPage,
 } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
@@ -230,6 +234,23 @@ export async function getIssueSlugs(): Promise<string[]> {
 }
 
 // ---- 키리누키 (백엔드 없으면 빈 목록)
+
+export async function getGraphNode(id: string): Promise<EgoGraph | null> {
+  try {
+    return await fetchGraphNode(id);
+  } catch {
+    return null;
+  }
+}
+
+/** 게임·사건 페이지. 백엔드 오류는 "error" (없는 주제 null 과 구별) */
+export async function getTopicPage(kind: "game" | "event", name: string, limit: number, offset: number): Promise<TopicPage | null | "error"> {
+  try {
+    return await fetchTopicPage(kind, name, limit, offset);
+  } catch {
+    return "error";
+  }
+}
 
 export async function getCalendar(month: string): Promise<CalendarMonth | null> {
   try {

@@ -23,6 +23,8 @@ import type {
   Song,
   CalendarMonth,
   CalendarEvent,
+  EgoGraph,
+  TopicPage,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -283,11 +285,28 @@ export async function fetchClip(videoId: string): Promise<ClipDetail | null> {
 export async function fetchSitemapEntries(): Promise<{
   channels: { platform: Platform; channelId: string; lastLiveAt: string }[];
   clips: { videoId: string; publishedAt: string }[];
+  topics: { kind: "game" | "event"; name: string; lastAt: string | null }[];
 }> {
   const res = await fetch(`${BASE}/api/sitemap`, { cache: "no-store", signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`backend /api/sitemap ${res.status}`);
-  const json = (await res.json()) as { channels?: []; clips?: [] };
-  return { channels: json.channels ?? [], clips: json.clips ?? [] };
+  const json = (await res.json()) as { channels?: []; clips?: []; topics?: [] };
+  return { channels: json.channels ?? [], clips: json.clips ?? [], topics: json.topics ?? [] };
+}
+
+/** 관계도 — 한 점을 가운데 둔 연결 (없으면 null) */
+export async function fetchGraphNode(id: string): Promise<EgoGraph | null> {
+  const res = await fetch(`${BASE}/api/graph/node?id=${encodeURIComponent(id)}`, fetchInit());
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`backend /api/graph/node ${res.status}`);
+  return (await res.json()) as EgoGraph;
+}
+
+/** 게임·사건 페이지 (없으면 null) */
+export async function fetchTopicPage(kind: "game" | "event", name: string, limit: number, offset: number): Promise<TopicPage | null> {
+  const res = await fetch(`${BASE}/api/topics/${kind}/${encodeURIComponent(name)}?limit=${limit}&offset=${offset}`, fetchInit());
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`backend /api/topics ${res.status}`);
+  return (await res.json()) as TopicPage;
 }
 
 /** 기념일 캘린더 한 달 (YYYY-MM, 비우면 이번 달) */

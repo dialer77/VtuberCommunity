@@ -15,6 +15,7 @@ import { searchChannels } from "./search";
 import { listSongsOut, songsForProfile, youtubeForProfile, youtubeLiveItems, ytOnlyProfile } from "./youtube/view";
 import { calendarMonth, factsForProfile, upcomingEvents } from "./calendar/view";
 import { socialForProfile } from "./social/view";
+import { egoGraph, graphDegree, graphSearch, sitemapTopics, topicPage } from "./graph/view";
 import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
 import { BUNDLE_IDS, upNextFor } from "./clips/recommend";
 import { forYou } from "./clips/foryou";
@@ -290,6 +291,7 @@ export function buildApi(store: SqliteStore) {
     return {
       channels: [...store.indexableChannels(3, since), ...ytOnly],
       clips: store.clips.sitemapClips(20_000),
+      topics: sitemapTopics(store),
     };
   });
 
@@ -312,6 +314,7 @@ export function buildApi(store: SqliteStore) {
         songs: songsForProfile(store, p.youtube),
         facts: factsForProfile(store, "youtube", p.channelId),
         social: socialForProfile(store, "youtube", p.channelId, p.channelId),
+        graphDegree: graphDegree(store, "youtube", p.channelId),
       };
     }
     const profile = store.getChannelProfile(channelId);
@@ -330,7 +333,40 @@ export function buildApi(store: SqliteStore) {
       songs: songsForProfile(store, youtube),
       facts: factsForProfile(store, profile.platform, profile.channelId),
       social: socialForProfile(store, profile.platform, profile.channelId, youtube?.ytChannelId ?? null),
+      graphDegree: graphDegree(store, profile.platform, profile.channelId),
     };
+  });
+
+  // 관계도 — 한 점을 가운데 둔 연결 (?id=v:chzzk:<채널ID> · a:<소속사> · g:<게임 키> · e:<사건 키> · i:<이슈>)
+  app.get("/api/graph/node", async (req, reply) => {
+    const q = req.query as { id?: string };
+    const r = typeof q.id === "string" && q.id.length <= 200 ? egoGraph(store, q.id) : null;
+    if (!r) {
+      reply.code(404);
+      return { error: "not_found" };
+    }
+    return r;
+  });
+
+  // 게임·사건 페이지 — /api/topics/game/<이름> · /api/topics/event/<이름> ?limit=24&offset=0
+  app.get("/api/topics/:kind/:name", async (req, reply) => {
+    const { kind, name } = req.params as { kind: string; name: string };
+    const q = req.query as { limit?: string; offset?: string };
+    const r =
+      (kind === "game" || kind === "event") && name.length <= 100
+        ? topicPage(store, kind, name, Math.min(60, Math.max(1, Number(q.limit) || 24)), Math.max(0, Number(q.offset) || 0))
+        : null;
+    if (!r) {
+      reply.code(404);
+      return { error: "not_found" };
+    }
+    return r;
+  });
+
+  // 검색 바로가기 — 운영자가 이은 검색어, 이름이 맞는 게임·사건·소속사
+  app.get("/api/graph/search", async (req) => {
+    const q = req.query as { q?: string };
+    return graphSearch(store, typeof q.q === "string" ? q.q.slice(0, 60) : "");
   });
 
   // 기념일 캘린더 — 한 달 (?month=YYYY-MM, 없으면 이번 달 KST)

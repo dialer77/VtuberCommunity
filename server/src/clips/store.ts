@@ -1023,6 +1023,41 @@ export class ClipRepo {
     return n;
   }
 
+  /** 관계 그래프 재료 — 보이는 클립의 주제·사건·출연 버튜버 (가벼운 열만) */
+  graphRows(): { videoId: string; topic: string | null; event: string | null; publishedAt: string; vtubers: { platform: Platform; channelId: string }[] }[] {
+    const rows = this.db
+      .prepare(`
+        SELECT c.video_id, c.topic, c.event, c.published_at FROM clips c JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
+        WHERE ${VISIBLE}
+      `)
+      .all() as unknown as Array<{ video_id: string; topic: string | null; event: string | null; published_at: string }>;
+    const vts = this.db
+      .prepare(`SELECT video_id, platform, channel_id FROM clip_vtubers ORDER BY video_id, position`)
+      .all() as unknown as Array<{ video_id: string; platform: Platform; channel_id: string }>;
+    const byClip = new Map<string, { platform: Platform; channelId: string }[]>();
+    for (const v of vts) {
+      const list = byClip.get(v.video_id);
+      const item = { platform: v.platform, channelId: v.channel_id };
+      if (list) list.push(item);
+      else byClip.set(v.video_id, [item]);
+    }
+    return rows.map((r) => ({ videoId: r.video_id, topic: r.topic, event: r.event, publishedAt: r.published_at, vtubers: byClip.get(r.video_id) ?? [] }));
+  }
+
+  /** 게임·사건 페이지 — 그 주제(또는 사건)의 클립 (주제는 대소문자 무시) */
+  clipsByTopicOrEvent(kind: "topic" | "event", value: string, limit: number, offset: number): { total: number; clips: ClipRow[] } {
+    const cond = kind === "topic" ? `lower(c.topic) = lower(?)` : `c.event = ?`;
+    const total = Number(
+      (
+        this.db
+          .prepare(`SELECT COUNT(*) AS n FROM clips c JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id WHERE ${VISIBLE} AND ${cond}`)
+          .get(value) as { n: number }
+      ).n,
+    );
+    const clips = this.selectClips(`${VISIBLE} AND ${cond}`, `ORDER BY COALESCE(st.likes, 0) DESC, c.published_at DESC LIMIT ? OFFSET ?`, [value, limit, offset]);
+    return { total, clips };
+  }
+
   /** 좋아요·투표·재생목록에 담을 수 있는 클립인지 (분류 완료 + 차단 안 됨) */
   isVisible(videoId: string): boolean {
     return !!this.getClip(videoId);

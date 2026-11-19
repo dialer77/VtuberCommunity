@@ -246,6 +246,40 @@ export interface ChannelProfile {
   facts?: ProfileFacts | null;
   /** 공식 SNS·커뮤니티·팬아트 태그 (없으면 null) */
   social?: ProfileSocial | null;
+  /** 관계 그래프에서 이어진 수 (0 이면 관계도 탭 숨김) */
+  graphDegree?: number;
+}
+
+export type GraphNodeType = "vtuber" | "agency" | "group" | "game" | "event" | "issue";
+
+/** 관계 그래프의 점 */
+export interface GraphNode {
+  id: string;
+  type: GraphNodeType;
+  label: string;
+  sub: string | null;
+  href: string;
+  platform?: Platform;
+  channelId?: string;
+}
+
+export interface MapGroup {
+  key: string;
+  label: string;
+  items: { node: GraphNode; weight: number; manual?: boolean }[];
+  more: number;
+}
+
+/** 한 점을 가운데 둔 관계도 */
+export interface EgoGraph {
+  center: GraphNode;
+  groups: MapGroup[];
+}
+
+/** 게임·사건 페이지 */
+export interface TopicPage extends EgoGraph {
+  clipTotal: number;
+  clips: Clip[];
 }
 
 export interface ProfileSocial {

@@ -94,14 +94,20 @@ export default async function ClipPage({ params }: { params: Params }) {
         </Row>
         <Row label="무엇을">
           {c.category ? <ClipTagChip tag={c.category} href={`/clips?tag=${c.category.id}`} /> : null}
-          {c.topic ? <span>{c.topic}</span> : null}
+          {c.topic ? (
+            <Link href={`/game/${encodeURIComponent(c.topic)}`} className="hover:text-accent hover:underline">
+              {c.topic}
+            </Link>
+          ) : null}
         </Row>
         <Row label="어떤 순간">
           {c.moments.length ? c.moments.map((m) => <ClipTagChip key={m.id} tag={m} href={`/clips?tag=${m.id}`} />) : <span className="text-muted-2">-</span>}
         </Row>
         {c.event ? (
           <Row label="어떤 일">
-            <span className="rounded-full bg-accent/10 px-2 py-0.5 text-accent">{c.event}</span>
+            <Link href={`/event/${encodeURIComponent(c.event)}`} className="rounded-full bg-accent/10 px-2 py-0.5 text-accent hover:bg-accent/20">
+              {c.event}
+            </Link>
           </Row>
         ) : null}
         {c.source || c.sourceDate ? (

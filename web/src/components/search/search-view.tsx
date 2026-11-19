@@ -8,7 +8,7 @@ import { SearchIcon } from "@/components/search/header-search";
 import { formatCount, formatDate, formatYmd } from "@/lib/format";
 import { ClipGrid } from "@/components/clip-card";
 import { SongGrid } from "@/components/song-card";
-import type { Clip, SearchResponse, SearchResult, Song, TagCount, TagKind, VmoaTag } from "@/types";
+import type { Clip, GraphNode, SearchResponse, SearchResult, Song, TagCount, TagKind, VmoaTag } from "@/types";
 
 export const PAGE_SIZE = 30;
 const KIND_LABEL: Record<TagKind, string> = { agency: "소속사", concept: "컨셉", content: "콘텐츠" };
@@ -275,6 +275,7 @@ export function SearchView({ initial, initialQuery }: { initial: SearchResponse 
         </>
       ) : null}
 
+      <GraphShortcuts q={query.q} />
       <SongResults q={query.q} />
       <ClipResults q={query.q} />
     </div>
@@ -282,6 +283,62 @@ export function SearchView({ initial, initialQuery }: { initial: SearchResponse 
 }
 
 /** 같은 검색어로 찾은 키리누키 (제목·요약·게임·사건·버튜버·채널) */
+const NODE_LABEL: Record<GraphNode["type"], string> = { vtuber: "버튜버", agency: "소속사", group: "그룹", game: "게임·콘텐츠", event: "사건·밈", issue: "이슈" };
+
+/** 검색 바로가기: 운영자가 이은 검색어 + 이름이 맞는 게임·사건·소속사 (관계 그래프) */
+function GraphShortcuts({ q }: { q: string }) {
+  const [res, setRes] = useState<{ q: string; shortcuts: GraphNode[]; topics: GraphNode[] } | null>(null);
+  const text = q.trim();
+  useEffect(() => {
+    if (text.length < 2) return;
+    const ac = new AbortController();
+    const h = setTimeout(() => {
+      fetch(`/api/graph-search?q=${encodeURIComponent(text)}`, { signal: ac.signal })
+        .then((r) => (r.ok ? r.json() : { shortcuts: [], topics: [] }))
+        .then((j: { shortcuts?: GraphNode[]; topics?: GraphNode[] }) => setRes({ q: text, shortcuts: j.shortcuts ?? [], topics: j.topics ?? [] }))
+        .catch(() => undefined);
+    }, 250);
+    return () => {
+      clearTimeout(h);
+      ac.abort();
+    };
+  }, [text]);
+  if (text.length < 2 || !res || res.q !== text || (res.shortcuts.length === 0 && res.topics.length === 0)) return null;
+  return (
+    <section className="flex flex-col gap-2" aria-label="바로가기">
+      {res.shortcuts.map((n) => (
+        <Link
+          key={n.id}
+          href={n.href}
+          prefetch={false}
+          className="flex items-center justify-between rounded-xl border border-accent/50 bg-accent/5 px-4 py-3 hover:bg-accent/10 transition-colors"
+        >
+          <span>
+            <span className="text-xs text-muted-2">{NODE_LABEL[n.type]} 바로가기</span>
+            <span className="block font-bold">{n.label}</span>
+          </span>
+          <span className="text-accent">→</span>
+        </Link>
+      ))}
+      {res.topics.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-bold text-muted">게임·사건·소속사</span>
+          {res.topics.map((n) => (
+            <Link
+              key={n.id}
+              href={n.href}
+              prefetch={false}
+              className="rounded-full border border-border bg-surface px-2.5 py-1 text-[13px] hover:border-accent/50 hover:text-accent transition-colors"
+            >
+              {n.label} <span className="text-muted-2">{NODE_LABEL[n.type]}</span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function SongResults({ q }: { q: string }) {
   const [res, setRes] = useState<{ q: string; total: number; songs: Song[] } | null>(null);
   const text = q.trim();

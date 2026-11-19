@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getChannelProfile } from "@/lib/data";
+import { getChannelProfile, getGraphNode } from "@/lib/data";
+import { MindMap } from "@/components/mind-map";
 import { Avatar } from "@/components/avatar";
 import { PlatformBadge } from "@/components/platform-badge";
 import { formatCount, formatDate, formatDateTime, formatYmd } from "@/lib/format";
@@ -55,9 +56,10 @@ export default async function VtuberProfilePage({
   const clips = p.clips ?? null;
   const songs = p.songs ?? null;
   const social = p.social ?? null;
+  const hasMap = (p.graphDegree ?? 0) > 0;
   // 유튜브 전용 버튜버는 방송 기록이 없다 → 공식 영상(또는 노래·키리누키)이 첫 탭
   const ytOnly = p.ytOnly ?? null;
-  type Tab = "history" | "videos" | "songs" | "clips" | "sns";
+  type Tab = "history" | "videos" | "songs" | "clips" | "sns" | "map";
   const firstTab: Tab = ytOnly ? (yt ? "videos" : songs ? "songs" : "clips") : "history";
   const activeTab: Tab =
     tab === "videos" && yt
@@ -68,7 +70,10 @@ export default async function VtuberProfilePage({
           ? "clips"
           : tab === "sns" && social
             ? "sns"
-            : firstTab;
+            : tab === "map" && hasMap
+              ? "map"
+              : firstTab;
+  const egoMap = activeTab === "map" ? await getGraphNode(`v:${p.platform}:${p.channelId}`) : null;
   const songKind = kind === "cover" || kind === "original" ? kind : undefined;
   const shownSongs = songs ? songs.songs.filter((s) => !songKind || s.kind === songKind) : [];
   const base = `/vtuber/${p.platform}/${p.channelId}`;
@@ -240,7 +245,7 @@ export default async function VtuberProfilePage({
       )}
 
       {/* 탭: 이전 방송 기록 · 공식 영상(유튜브 채널이 연결됐을 때) · 노래 · 키리누키(클립이 있을 때) */}
-      {yt || clips || songs || social ? (
+      {yt || clips || songs || social || hasMap ? (
         <nav className="flex flex-wrap gap-2" aria-label="프로필 탭">
           {ytOnly ? null : <TabLink href={base} active={activeTab === "history"} label="이전 방송 기록" />}
           {yt ? (
@@ -257,12 +262,17 @@ export default async function VtuberProfilePage({
             <TabLink href={firstTab === "clips" ? base : `${base}?tab=clips`} active={activeTab === "clips"} label={`키리누키 ${clips.total}`} />
           ) : null}
           {social ? <TabLink href={`${base}?tab=sns`} active={activeTab === "sns"} label="SNS·팬아트" /> : null}
+          {hasMap ? <TabLink href={`${base}?tab=map`} active={activeTab === "map"} label="관계도" /> : null}
         </nav>
       ) : null}
 
       {activeTab === "videos" && yt ? (
         <section className="flex flex-col gap-3" aria-label="공식 영상">
           <YoutubeVideos yt={yt} ytOnly={!!ytOnly} />
+        </section>
+      ) : activeTab === "map" ? (
+        <section aria-label="관계도">
+          {egoMap ? <MindMap graph={egoMap} narrow /> : <p className="text-sm text-muted-2">관계도를 불러오지 못했어요.</p>}
         </section>
       ) : activeTab === "sns" && social ? (
         <section aria-label="SNS·팬아트">
@@ -348,7 +358,7 @@ export default async function VtuberProfilePage({
         </section>
       ) : (
       <section className="flex flex-col gap-3">
-        {yt || clips || songs || social ? null : <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>}
+        {yt || clips || songs || social || hasMap ? null : <h2 className="text-sm font-bold text-muted">이전 방송 기록</h2>}
         {p.broadcasts.length === 0 ? (
           <p className="text-sm text-muted-2">아직 기록된 방송이 없어요.</p>
         ) : (
