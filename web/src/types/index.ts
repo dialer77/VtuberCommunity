@@ -266,7 +266,8 @@ export interface GraphNode {
 export interface MapGroup {
   key: string;
   label: string;
-  items: { node: GraphNode; weight: number; manual?: boolean }[];
+  /** href: 이 관계의 페이지 (합방 → 합방 조합 페이지). 없으면 점의 페이지 */
+  items: { node: GraphNode; weight: number; manual?: boolean; href?: string }[];
   more: number;
 }
 
@@ -274,6 +275,31 @@ export interface MapGroup {
 export interface EgoGraph {
   center: GraphNode;
   groups: MapGroup[];
+}
+
+/** 두 버튜버에게 공통인 것 (a·b = 각자의 클립 수) */
+export interface SharedNode {
+  node: GraphNode;
+  a: number;
+  b: number;
+}
+
+/** 합방 조합 페이지 */
+export interface DuoPage {
+  a: GraphNode;
+  b: GraphNode;
+  canonical: string;
+  together: number;
+  sameAgency: SharedNode[];
+  games: SharedNode[];
+  events: SharedNode[];
+  clipTotal: number;
+  clips: Clip[];
+}
+
+/** 입문 모음의 클립 (고른 이유 포함) */
+export interface IntroClip extends Clip {
+  reason: string;
 }
 
 /** 게임·사건 페이지 */

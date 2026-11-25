@@ -11,7 +11,7 @@
 import type { SqliteStore } from "../store/sqlite";
 import type { Platform } from "../domain";
 import { TAG_CATALOG, resolveChannelTags } from "../tags/catalog";
-import { isGenericTopic, topicKey } from "../clips/topics";
+import { isSpecificTopic, topicKey } from "../clips/topics";
 import { log } from "../log";
 
 export type NodeType = "vtuber" | "agency" | "group" | "game" | "event" | "issue";
@@ -57,8 +57,6 @@ const MIN_PLAYS = 2;
 const ACTIVE_DAYS = 180;
 /** 이슈에 적혀도 사람이 아닌 이름 (플랫폼·일반 낱말) */
 const NOT_PERSON = new Set(["soop", "숲", "치지직", "chzzk", "유튜브", "youtube", "아프리카tv", "아프리카", "트위치", "twitch", "네이버", "버튜버", "버추얼", "vtuber"]);
-/** 게임·콘텐츠라고 하기 어려운 주제 ("스텔라이브 합방", "잡담" 등) */
-const GENERIC_PART = /(합방|잡담|저챗|토크|소통|방송|콘텐츠|컨텐츠)$/;
 
 export const vtuberId = (platform: Platform, channelId: string) => `v:${platform}:${channelId}`;
 export const gameId = (topic: string) => `g:${topicKey(topic)}`;
@@ -113,11 +111,8 @@ export function buildGraph(store: SqliteStore): Graph {
     addName(t.label, aid);
   }
   const agencyNames = new Set(TAG_CATALOG.filter((t) => t.kind === "agency").map((t) => norm(t.label)));
-  const isGame = (topic: string | null): topic is string => {
-    if (!topic || isGenericTopic(topic)) return false;
-    const k = norm(topic);
-    return !agencyNames.has(k) && !GENERIC_PART.test(k);
-  };
+  // 게임·콘텐츠 점: 일반 주제·"○○ 합방/잡담"·소속사 이름은 빼고
+  const isGame = (topic: string | null): topic is string => isSpecificTopic(topic) && !agencyNames.has(norm(topic));
   for (const ch of src.channels) {
     const a = act.get(ch.channelId);
     const agencies = resolveChannelTags(ch.channelId, tags.get(ch.channelId) ?? []).filter((id) => agencyTags.has(id));

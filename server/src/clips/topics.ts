@@ -48,15 +48,40 @@ export const SEED_TOPIC_ALIASES: Record<string, string> = {
   저챗: "저스트 채팅",
   잡담: "저스트 채팅",
   justchatting: "저스트 채팅",
+  // 운영 데이터에서 같은 것이 여러 이름으로 갈린 것 (2026-11-25)
+  스텔마크: "마인크래프트 스텔서버",
+  스텔마크서버: "마인크래프트 스텔서버",
+  스텔서버: "마인크래프트 스텔서버",
+  마인크래프트스텔서버: "마인크래프트 스텔서버",
+  마크스텔서버: "마인크래프트 스텔서버",
+  gta6: "GTA 6",
+  gtavi: "GTA 6",
+  grandtheftautovi: "GTA 6",
+  커버곡: "노래 커버",
+  노래커버: "노래 커버",
+  커버: "노래 커버",
+  저스트채팅: "저스트 채팅",
 };
 
 // 너무 일반적인 주제 — 같아도 "같은 게임·콘텐츠"라고 하기 어렵다 (추천 근거로 약하게만 쓴다)
 const GENERIC = new Set(
-  ["저스트 채팅", "저챗", "잡담", "토크", "노래 방송", "노래", "합방", "방송", "게임", "시청자 사연", "리액션", "먹방", "그림", "ASMR", "종합게임", "기타"].map(topicKey),
+  [
+    "저스트 채팅", "저챗", "잡담", "토크", "노래 방송", "노래", "합방", "방송", "게임", "시청자 사연", "리액션", "먹방", "그림", "ASMR", "종합게임", "기타",
+    // 게임·콘텐츠라기보다 방송 종류 (2026-11-25 운영 데이터)
+    "노래 커버", "클립 모음", "버츄얼 예능", "저챗 하이라이트", "하이라이트", "데뷔 방송", "신의상 공개", "성대모사", "술방", "그림 방송", "공포게임", "FPS 게임",
+  ].map(topicKey),
 );
 
 export function isGenericTopic(topic: string | null): boolean {
   return !topic || GENERIC.has(topicKey(topic));
+}
+
+/** "스텔라이브 합방"·"○○ 잡담"·"△△ 방송"처럼 누구의 방송 종류일 뿐인 주제 */
+const GENERIC_SUFFIX = /(합방|잡담|저챗|토크|소통|방송|콘텐츠|컨텐츠)$/;
+
+/** 게임·콘텐츠 이름으로 쓸 만한 주제인지 (일반 주제·"○○ 합방/잡담/방송" 제외) — 관계 그래프·입문 모음 */
+export function isSpecificTopic(topic: string | null): topic is string {
+  return !!topic && !isGenericTopic(topic) && !GENERIC_SUFFIX.test(topicKey(topic));
 }
 
 /** 주제 → 정식 이름 (별칭 사전 우선, 없으면 그대로) */

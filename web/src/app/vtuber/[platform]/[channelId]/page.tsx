@@ -315,6 +315,18 @@ export default async function VtuberProfilePage({
         </section>
       ) : activeTab === "clips" && clips ? (
         <section className="flex flex-col gap-4" aria-label="키리누키">
+          {clips.total >= 6 ? (
+            <Link
+              href={`${base}/intro`}
+              className="flex items-center justify-between rounded-xl border border-accent/50 bg-accent/5 px-4 py-3 hover:bg-accent/10 transition-colors"
+            >
+              <span>
+                <span className="block font-bold">{p.name} 처음이라면</span>
+                <span className="text-xs text-muted">명장면·좋아요·자주 하는 게임을 골고루 고른 입문 키리누키</span>
+              </span>
+              <span className="text-accent">→</span>
+            </Link>
+          ) : null}
           {clips.traits.length || clips.topics.length ? (
             <div className="flex flex-col gap-2 rounded-xl border border-border bg-surface p-4">
               <p className="text-xs font-bold text-muted">클립으로 본 {p.name} (버모아 분류)</p>

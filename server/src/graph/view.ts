@@ -19,7 +19,8 @@ export interface NodeOut {
 export interface MapGroup {
   key: string;
   label: string;
-  items: { node: NodeOut; weight: number; manual?: boolean }[];
+  /** href = 이 관계의 페이지 (예: 합방 → 두 사람의 합방 조합 페이지). 없으면 점의 페이지 */
+  items: { node: NodeOut; weight: number; manual?: boolean; href?: string }[];
   /** 더 있는 수 */
   more: number;
 }
@@ -60,12 +61,19 @@ function neighbors(g: Graph, id: string, type: EdgeType, nodeType?: NodeType): {
     .filter((x) => !!x.n && (!nodeType || x.n.type === nodeType));
 }
 
-function group(key: string, label: string, list: { n: GNode; weight: number; manual?: boolean }[], limit = PER_GROUP): MapGroup | null {
+function group(
+  key: string,
+  label: string,
+  list: { n: GNode; weight: number; manual?: boolean; href?: string }[],
+  limit = PER_GROUP,
+): MapGroup | null {
   if (list.length === 0) return null;
   return {
     key,
     label,
-    items: list.slice(0, limit).map((x) => ({ node: nodeOut(x.n), weight: x.weight, ...(x.manual ? { manual: true } : {}) })),
+    items: list
+      .slice(0, limit)
+      .map((x) => ({ node: nodeOut(x.n), weight: x.weight, ...(x.manual ? { manual: true } : {}), ...(x.href ? { href: x.href } : {}) })),
     more: Math.max(0, list.length - limit),
   };
 }
@@ -90,7 +98,7 @@ export function egoGraph(store: SqliteStore, id: string): { center: NodeOut; gro
   if (c.type === "vtuber") {
     const orgs = pick("member");
     groups.push(group("member", "소속", orgs));
-    groups.push(group("collab", "자주 합방", pick("collab").sort(byWeight)));
+    groups.push(group("collab", "자주 합방", pick("collab").sort(byWeight).map((x) => ({ ...x, href: duoHref(c, x.n) }))));
     const mates = new Map<string, GNode>();
     const collabIds = new Set(pick("collab").map((x) => x.n.id));
     for (const o of orgs) for (const m of neighbors(g, o.n.id, "member", "vtuber")) if (m.n.id !== id && !collabIds.has(m.n.id)) mates.set(m.n.id, m.n);
@@ -117,6 +125,65 @@ export function egoGraph(store: SqliteStore, id: string): { center: NodeOut; gro
     groups.push(group("mentions", "관련 버튜버·소속사", pick("mentions").sort((a, b) => b.n.score - a.n.score), 20));
   }
   return { center: nodeOut(c), groups: groups.filter((x): x is MapGroup => !!x) };
+}
+
+// ---------------------------------------------------------------- 합방 조합
+
+const vtKey = (n: GNode) => `${n.platform}:${n.channelId}`;
+
+/** 두 버튜버의 합방 조합 페이지 주소 (점 id 순서로 하나로) */
+export function duoHref(a: GNode, b: GNode): string {
+  const [x, y] = a.id < b.id ? [a, b] : [b, a];
+  return `/duo/${encodeURIComponent(vtKey(x))}/${encodeURIComponent(vtKey(y))}`;
+}
+
+function shared(g: Graph, a: string, b: string, type: EdgeType, nodeType: NodeType) {
+  const wa = new Map(neighbors(g, a, type, nodeType).map((x) => [x.n.id, x.e.weight]));
+  return neighbors(g, b, type, nodeType)
+    .filter((x) => wa.has(x.n.id))
+    .map((x) => ({ node: nodeOut(x.n), a: wa.get(x.n.id)!, b: x.e.weight }))
+    .sort((p, q) => Math.min(q.a, q.b) - Math.min(p.a, p.b));
+}
+
+/** 합방 조합 페이지: 함께 나온 클립 · 같이 한 게임 · 같이 엮인 사건 · 같은 소속 (함께 나온 클립이 없으면 null) */
+export function duoPage(
+  store: SqliteStore,
+  a: { platform: Platform; channelId: string },
+  b: { platform: Platform; channelId: string },
+  limit: number,
+  offset: number,
+) {
+  const g = getGraph(store);
+  const na = g.nodes.get(vtuberId(a.platform, a.channelId));
+  const nb = g.nodes.get(vtuberId(b.platform, b.channelId));
+  if (!na || !nb || na.id === nb.id) return null;
+  const r = store.clips.clipsWithBoth(a, b, limit, offset);
+  if (r.total === 0) return null;
+  const [x, y] = na.id < nb.id ? [na, nb] : [nb, na];
+  return {
+    a: nodeOut(x),
+    b: nodeOut(y),
+    canonical: duoHref(x, y),
+    together: r.total,
+    sameAgency: shared(g, x.id, y.id, "member", "agency").concat(shared(g, x.id, y.id, "member", "group")),
+    games: shared(g, x.id, y.id, "plays", "game").slice(0, 10),
+    events: shared(g, x.id, y.id, "event", "event").slice(0, 8),
+    clipTotal: r.total,
+    clips: toClipOuts(store, r.clips),
+  };
+}
+
+/** 사이트맵: 함께 나온 클립 5개 이상인 조합 (많은 순) */
+export function sitemapDuos(store: SqliteStore, limit = 500): { path: string; weight: number }[] {
+  const g = getGraph(store);
+  const out: { path: string; weight: number }[] = [];
+  for (const [id, list] of g.adj) {
+    for (const e of list) {
+      if (e.type !== "collab" || e.weight < 5 || id > e.to) continue;
+      out.push({ path: duoHref(g.nodes.get(id)!, g.nodes.get(e.to)!), weight: e.weight });
+    }
+  }
+  return out.sort((p, q) => q.weight - p.weight).slice(0, limit);
 }
 
 /** 프로필의 '관계도' 탭을 보일지 (이웃 수) */

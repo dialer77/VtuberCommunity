@@ -80,7 +80,7 @@ function MapSvg({ graph, narrow }: { graph: EgoGraph; narrow?: boolean }) {
               const p = pt(r, deg);
               const right = Math.cos((deg * Math.PI) / 180) >= 0;
               return (
-                <a key={it.node.id} href={it.node.href}>
+                <a key={it.node.id} href={it.href ?? it.node.href}>
                   <title>{`${it.node.label} · ${TYPE_LABEL[it.node.type]}${it.weight > 1 ? ` · ${it.weight}` : ""}`}</title>
                   <line x1={hub.x} y1={hub.y} x2={p.x} y2={p.y} stroke={color} strokeWidth={1.2} strokeOpacity={0.4} />
                   <circle cx={p.x} cy={p.y} r={it.node.type === "vtuber" ? 6 : 5} fill={color} />
@@ -130,8 +130,9 @@ function MapList({ groups }: { groups: MapGroup[] }) {
             {g.items.map((it) => (
               <Link
                 key={it.node.id}
-                href={it.node.href}
+                href={it.href ?? it.node.href}
                 prefetch={false}
+                title={it.href ? "함께 나온 클립 보기" : undefined}
                 className="rounded-full border border-border bg-surface px-2.5 py-1 text-[13px] hover:border-accent/50 hover:text-accent transition-colors"
               >
                 {it.node.label}

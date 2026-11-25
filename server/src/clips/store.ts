@@ -569,6 +569,26 @@ export class ClipRepo {
   }
 
   /** 별칭 등록 + 기존 클립의 주제도 바꿈. 바꾼 클립 수 */
+  /**
+   * 기본 별칭(topics.ts SEED)을 아직 적용하지 않은 것만 기존 클립에도 적용 (서버 시작 때).
+   * 운영자가 같은 별칭을 따로 정했으면 그대로 둔다. 바뀐 클립 수
+   */
+  applySeedAliases(seeds: Record<string, string>): number {
+    const have = new Map(
+      (this.db.prepare(`SELECT alias, topic, source FROM clip_topic_alias`).all() as unknown as Array<{ alias: string; topic: string; source: string }>).map((r) => [
+        r.alias,
+        r,
+      ]),
+    );
+    let changed = 0;
+    for (const [alias, topic] of Object.entries(seeds)) {
+      const cur = have.get(topicKey(alias));
+      if (cur && (cur.source === "manual" || cur.topic === topic)) continue;
+      changed += this.setTopicAlias(alias, topic, "seed");
+    }
+    return changed;
+  }
+
   setTopicAlias(aliasRaw: string, topic: string, source: "manual" | "seed"): number {
     const alias = topicKey(aliasRaw);
     const to = topic.replace(/\s+/g, " ").trim();
@@ -1056,6 +1076,48 @@ export class ClipRepo {
     );
     const clips = this.selectClips(`${VISIBLE} AND ${cond}`, `ORDER BY COALESCE(st.likes, 0) DESC, c.published_at DESC LIMIT ? OFFSET ?`, [value, limit, offset]);
     return { total, clips };
+  }
+
+  /** 합방 조합 페이지 — 두 버튜버가 함께 나온 클립 (좋아요·최신순) */
+  clipsWithBoth(
+    a: { platform: Platform; channelId: string },
+    b: { platform: Platform; channelId: string },
+    limit: number,
+    offset: number,
+  ): { total: number; clips: ClipRow[] } {
+    const cond = `EXISTS (SELECT 1 FROM clip_vtubers v WHERE v.video_id = c.video_id AND v.platform = ? AND v.channel_id = ?)
+      AND EXISTS (SELECT 1 FROM clip_vtubers w WHERE w.video_id = c.video_id AND w.platform = ? AND w.channel_id = ?)`;
+    const args = [a.platform, a.channelId, b.platform, b.channelId];
+    const total = Number(
+      (
+        this.db
+          .prepare(`SELECT COUNT(*) AS n FROM clips c JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id WHERE ${VISIBLE} AND ${cond}`)
+          .get(...args) as { n: number }
+      ).n,
+    );
+    const clips = this.selectClips(`${VISIBLE} AND ${cond}`, `ORDER BY COALESCE(st.likes, 0) DESC, c.published_at DESC LIMIT ? OFFSET ?`, [...args, limit, offset]);
+    return { total, clips };
+  }
+
+  /** 클립이 min 개 이상인 버튜버 (사이트맵 입문 모음) */
+  vtubersWithClips(min: number): { platform: Platform; channelId: string; n: number }[] {
+    const rows = this.db
+      .prepare(`
+        SELECT v.platform, v.channel_id, COUNT(*) AS n FROM clip_vtubers v
+        JOIN clips c ON c.video_id = v.video_id JOIN clip_channels ch ON ch.yt_channel_id = c.yt_channel_id
+        WHERE ${VISIBLE} GROUP BY v.platform, v.channel_id HAVING n >= ? ORDER BY n DESC
+      `)
+      .all(min) as unknown as Array<{ platform: Platform; channel_id: string; n: number }>;
+    return rows.map((r) => ({ platform: r.platform, channelId: r.channel_id, n: Number(r.n) }));
+  }
+
+  /** 입문 모음 재료 — 그 버튜버가 나온 보이는 클립 전부 (최대 limit, 좋아요·최신순) */
+  vtuberPool(vt: { platform: Platform; channelId: string }, limit: number): ClipRow[] {
+    return this.selectClips(
+      `${VISIBLE} AND EXISTS (SELECT 1 FROM clip_vtubers v WHERE v.video_id = c.video_id AND v.platform = ? AND v.channel_id = ?)`,
+      `ORDER BY COALESCE(st.likes, 0) DESC, c.published_at DESC LIMIT ?`,
+      [vt.platform, vt.channelId, limit],
+    );
   }
 
   /** 좋아요·투표·재생목록에 담을 수 있는 클립인지 (분류 완료 + 차단 안 됨) */

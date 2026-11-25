@@ -25,6 +25,8 @@ import type {
   CalendarEvent,
   EgoGraph,
   TopicPage,
+  DuoPage,
+  IntroClip,
 } from "@/types";
 
 // 백엔드(자체 DB + API) 기본 주소. 배포 시 BACKEND_URL 로 주입.
@@ -286,11 +288,13 @@ export async function fetchSitemapEntries(): Promise<{
   channels: { platform: Platform; channelId: string; lastLiveAt: string }[];
   clips: { videoId: string; publishedAt: string }[];
   topics: { kind: "game" | "event"; name: string; lastAt: string | null }[];
+  duos: { path: string; weight: number }[];
+  intros: { platform: Platform; channelId: string }[];
 }> {
   const res = await fetch(`${BASE}/api/sitemap`, { cache: "no-store", signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`backend /api/sitemap ${res.status}`);
-  const json = (await res.json()) as { channels?: []; clips?: []; topics?: [] };
-  return { channels: json.channels ?? [], clips: json.clips ?? [], topics: json.topics ?? [] };
+  const json = (await res.json()) as { channels?: []; clips?: []; topics?: []; duos?: []; intros?: [] };
+  return { channels: json.channels ?? [], clips: json.clips ?? [], topics: json.topics ?? [], duos: json.duos ?? [], intros: json.intros ?? [] };
 }
 
 /** 관계도 — 한 점을 가운데 둔 연결 (없으면 null) */
@@ -307,6 +311,22 @@ export async function fetchTopicPage(kind: "game" | "event", name: string, limit
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`backend /api/topics ${res.status}`);
   return (await res.json()) as TopicPage;
+}
+
+/** 합방 조합 (a·b = "chzzk:<ID>", 함께 나온 클립이 없으면 null) */
+export async function fetchDuo(a: string, b: string, limit: number, offset: number): Promise<DuoPage | null> {
+  const res = await fetch(`${BASE}/api/duo/${encodeURIComponent(a)}/${encodeURIComponent(b)}?limit=${limit}&offset=${offset}`, fetchInit());
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`backend /api/duo ${res.status}`);
+  return (await res.json()) as DuoPage;
+}
+
+/** 입문 모음 (클립이 적으면 null) */
+export async function fetchIntro(platform: string, channelId: string): Promise<IntroClip[] | null> {
+  const res = await fetch(`${BASE}/api/intro/${encodeURIComponent(platform)}/${encodeURIComponent(channelId)}`, fetchInit());
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`backend /api/intro ${res.status}`);
+  return ((await res.json()) as { clips: IntroClip[] }).clips;
 }
 
 /** 기념일 캘린더 한 달 (YYYY-MM, 비우면 이번 달) */

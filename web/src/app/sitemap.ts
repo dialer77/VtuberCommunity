@@ -11,7 +11,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 백엔드가 멈춰 있어도 사이트맵은 나가야 하므로 프로필·클립은 실패하면 뺀다
   const [issues, entries] = await Promise.all([
     getIssues(),
-    fetchSitemapEntries().catch(() => ({ channels: [], clips: [], topics: [] })),
+    fetchSitemapEntries().catch(() => ({ channels: [], clips: [], topics: [], duos: [], intros: [] })),
   ]);
   const latestIssue = issues[0]?.publishedAt;
 
@@ -63,5 +63,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticRoutes, ...issueRoutes, ...profileRoutes, ...topicRoutes, ...clipRoutes];
+  // 합방 조합 (함께 나온 클립 5개 이상) · 입문 모음 (클립 10개 이상)
+  const duoRoutes: MetadataRoute.Sitemap = entries.duos.map((d) => ({ url: `${SITE}${d.path}`, changeFrequency: "weekly", priority: 0.4 }));
+  const introRoutes: MetadataRoute.Sitemap = entries.intros.map((v) => ({
+    url: `${SITE}/vtuber/${v.platform}/${encodeURIComponent(v.channelId)}/intro`,
+    changeFrequency: "weekly",
+    priority: 0.5,
+  }));
+
+  return [...staticRoutes, ...issueRoutes, ...profileRoutes, ...introRoutes, ...topicRoutes, ...duoRoutes, ...clipRoutes];
 }

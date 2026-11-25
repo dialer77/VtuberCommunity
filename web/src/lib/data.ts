@@ -26,6 +26,8 @@ import type {
   CalendarEvent,
   EgoGraph,
   TopicPage,
+  DuoPage,
+  IntroClip,
 } from "@/types";
 import {
   fetchLivesFromBackend,
@@ -48,6 +50,8 @@ import {
   fetchUpcomingEvents,
   fetchGraphNode,
   fetchTopicPage,
+  fetchDuo,
+  fetchIntro,
 } from "@/lib/backend";
 
 // 데이터 접근 층 (SERVE 단계).
@@ -234,6 +238,23 @@ export async function getIssueSlugs(): Promise<string[]> {
 }
 
 // ---- 키리누키 (백엔드 없으면 빈 목록)
+
+/** 합방 조합. 백엔드 오류는 "error" (함께 나온 적 없음 null 과 구별) */
+export async function getDuo(a: string, b: string, limit: number, offset: number): Promise<DuoPage | null | "error"> {
+  try {
+    return await fetchDuo(a, b, limit, offset);
+  } catch {
+    return "error";
+  }
+}
+
+export async function getIntro(platform: string, channelId: string): Promise<IntroClip[] | null | "error"> {
+  try {
+    return await fetchIntro(platform, channelId);
+  } catch {
+    return "error";
+  }
+}
 
 export async function getGraphNode(id: string): Promise<EgoGraph | null> {
   try {

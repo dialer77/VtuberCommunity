@@ -15,7 +15,8 @@ import { searchChannels } from "./search";
 import { listSongsOut, songsForProfile, youtubeForProfile, youtubeLiveItems, ytOnlyProfile } from "./youtube/view";
 import { calendarMonth, factsForProfile, upcomingEvents } from "./calendar/view";
 import { socialForProfile } from "./social/view";
-import { egoGraph, graphDegree, graphSearch, sitemapTopics, topicPage } from "./graph/view";
+import { duoPage, egoGraph, graphDegree, graphSearch, sitemapDuos, sitemapTopics, topicPage } from "./graph/view";
+import { introClips } from "./clips/intro";
 import { clipDetail, clipTagVotes, clipTagsWithCounts, clipsForProfile, toClipOuts } from "./clips/view";
 import { BUNDLE_IDS, upNextFor } from "./clips/recommend";
 import { forYou } from "./clips/foryou";
@@ -292,6 +293,9 @@ export function buildApi(store: SqliteStore) {
       channels: [...store.indexableChannels(3, since), ...ytOnly],
       clips: store.clips.sitemapClips(20_000),
       topics: sitemapTopics(store),
+      duos: sitemapDuos(store),
+      // 입문 모음: 클립 10개 이상 버튜버
+      intros: store.clips.vtubersWithClips(10).map(({ platform, channelId }) => ({ platform, channelId })),
     };
   });
 
@@ -361,6 +365,37 @@ export function buildApi(store: SqliteStore) {
       return { error: "not_found" };
     }
     return r;
+  });
+
+  // 합방 조합 — /api/duo/chzzk:<ID>/soop:<ID> ?limit=24&offset=0 (함께 나온 클립이 없으면 404)
+  app.get("/api/duo/:a/:b", async (req, reply) => {
+    const { a, b } = req.params as { a: string; b: string };
+    const q = req.query as { limit?: string; offset?: string };
+    const parse = (s: string) => {
+      const i = s.indexOf(":");
+      const platform = s.slice(0, i) as Platform;
+      const channelId = s.slice(i + 1);
+      return i > 0 && PLATFORMS.includes(platform) && channelId.length > 0 && channelId.length <= 64 ? { platform, channelId } : null;
+    };
+    const pa = parse(a);
+    const pb = parse(b);
+    const r = pa && pb ? duoPage(store, pa, pb, Math.min(60, Math.max(1, Number(q.limit) || 24)), Math.max(0, Number(q.offset) || 0)) : null;
+    if (!r) {
+      reply.code(404);
+      return { error: "not_found" };
+    }
+    return r;
+  });
+
+  // 입문 모음 "OO 처음이라면" — 그 버튜버의 키리누키 중 처음 보기 좋은 것 (클립이 적으면 404)
+  app.get("/api/intro/:platform/:channelId", async (req, reply) => {
+    const { platform, channelId } = req.params as { platform: string; channelId: string };
+    const clips = PLATFORMS.includes(platform as Platform) ? introClips(store, { platform: platform as Platform, channelId }) : null;
+    if (!clips) {
+      reply.code(404);
+      return { error: "not_found" };
+    }
+    return { clips };
   });
 
   // 검색 바로가기 — 운영자가 이은 검색어, 이름이 맞는 게임·사건·소속사

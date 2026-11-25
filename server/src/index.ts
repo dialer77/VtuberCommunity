@@ -14,6 +14,7 @@ import { setAgencyRoster } from "./tags/catalog";
 import { startYoutubeSync } from "./youtube/sync";
 import { startClipSync } from "./clips/sync";
 import { startSocialSync } from "./social/sync";
+import { SEED_TOPIC_ALIASES } from "./clips/topics";
 
 function makeStore(): Store {
   switch (config.storeKind) {
@@ -35,6 +36,9 @@ if (store instanceof SqliteStore) {
   if (n > 0) log.info(`일별 집계 백필: 스냅샷 ${n}사이클 반영`);
   const b = store.backfillBroadcastTags();
   if (b > 0) log.info(`방송별 태그 백필: ${b}개 방송`);
+  // 키리누키 주제 기본 별칭을 기존 클립에도 (새로 더한 것만, 운영자 별칭이 우선)
+  const t = store.clips.applySeedAliases(SEED_TOPIC_ALIASES);
+  if (t > 0) log.info(`키리누키 주제 이름 통일: ${t}개 클립`);
 
   // 소속사 명단: 방송 기록에서 꾸준히 소속사 태그를 단 채널 + 웹 데뷔 소식의 소속사 + 미리 계산한 명단 (30분마다 갱신)
   const rosterSeed = loadRosterSeed();
