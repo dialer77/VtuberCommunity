@@ -71,6 +71,8 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans">
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        {/* RSS 피드 (네이버 서치어드바이저 등 수집용) — 페이지별 alternates(canonical)에 덮이지 않게 메타데이터 대신 직접 둔다. React 가 <head> 로 옮긴다 */}
+        <link rel="alternate" type="application/rss+xml" title="버모아 VMOA — 버튜버 이슈" href="/rss.xml" />
         {/* 애드센스: 공식 안내대로 HTML 에 그대로 들어가는 async 스크립트 (React 가 <head> 로 옮긴다). next/script 는 HTML 에 preload 만 남아 소유권 확인에서 못 찾을 수 있다 */}
         {ADSENSE_CLIENT ? (
           <script

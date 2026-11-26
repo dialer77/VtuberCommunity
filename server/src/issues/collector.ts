@@ -5,6 +5,7 @@ import { runClaudeJson } from "./claude";
 import { enrichSource } from "./preview";
 import { config } from "../config";
 import { log } from "../log";
+import { notifyIndexNow } from "../indexnow";
 
 interface RawSource {
   url: string;
@@ -190,5 +191,8 @@ export async function collectIssues(store: SqliteStore, windowHours?: number): P
   );
   for (const a of summary.added) log.event(`  📰 ${a}`);
   for (const s of summary.skipped) log.info(`  (건너뜀) ${s.title} — ${s.reason}`);
+  if (summary.added.length > 0) {
+    await notifyIndexNow([...summary.added.map((a) => `/issue/${a.split(" ")[0]}`), "/issue", "/"]);
+  }
   return summary;
 }

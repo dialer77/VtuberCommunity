@@ -80,6 +80,10 @@ export const config = {
   issuesIntervalMin: Number(process.env.ISSUES_INTERVAL_MIN ?? 180),
   /** 한 번에 올릴 최대 이슈 수 */
   issuesMaxPerRun: Number(process.env.ISSUES_MAX_PER_RUN ?? 5),
+  /** 새 이슈 글을 IndexNow(빙 등)로 알리기 (기본: 이슈 수집과 같이 켜짐), 0 = 끔 — src/indexnow.ts */
+  indexNowEnabled: (process.env.INDEXNOW_ENABLED ?? process.env.ISSUES_ENABLED) === "1",
+  /** 웹 사이트 주소 (IndexNow 에 알릴 주소의 기준) */
+  siteUrl: process.env.SITE_URL ?? "https://vmoa.live",
   /** 신규 데뷔 웹 수집 (기본: 이슈 수집과 같이 켜짐) */
   debutsEnabled: (process.env.DEBUTS_ENABLED ?? process.env.ISSUES_ENABLED) === "1",
   /** 데뷔 수집 주기(분). 기본 6시간 */

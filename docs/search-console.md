@@ -1,4 +1,4 @@
-# 검색엔진 등록 — Google Search Console (+ 네이버 서치어드바이저)
+# 검색엔진 등록 — Google Search Console · 네이버 서치어드바이저 · Bing 웹마스터 도구
 
 > 대상: `https://vmoa.live` (웹, Vercel). 한국 사용자 대상이라 네이버 등록도 권장.
 
@@ -11,6 +11,8 @@
 | 대표 주소 | `vmoa.live` 하나로 통일 — `www.vmoa.live` 는 308 리다이렉트 |
 | 메타데이터 | 페이지별 title/description, `lang="ko"`, OG·트위터 카드, 이슈 상세는 canonical·대표 이미지·Article JSON-LD |
 | 검색 제외 | `/coins`(베타) `noindex` · `api.vmoa.live`(JSON API) 응답 전체 `X-Robots-Tag: noindex` · 없는 페이지 `noindex` |
+| RSS | `https://vmoa.live/rss.xml` — 최근 이슈 30개 (네이버 RSS 제출용), 모든 페이지에 `<link rel="alternate">` |
+| IndexNow (Bing 등) | 새 이슈가 올라오면 서버가 `/issue/<slug>`·`/issue`·`/` 를 알림 (`server/src/indexnow.ts`, 기본: `ISSUES_ENABLED` 를 따라감, `INDEXNOW_ENABLED=0` 으로 끔). 키 파일 `web/public/b8d1f735….txt` (공개 값) |
 | 소유 확인 태그 | 필요 시 Vercel 환경변수 `GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION` 로 `<meta>` 출력 |
 
 ## 1. Google Search Console 등록
@@ -36,7 +38,18 @@
    (또는 DNS TXT 방식이 보이면 그쪽도 가능 — Cloudflare 에 TXT 추가)
 4. 확인 후 **요청 → 사이트맵 제출** → `https://vmoa.live/sitemap.xml`
 
-## 3. 등록 후 확인할 것
+## 3. Bing 웹마스터 도구
+
+1. https://www.bing.com/webmasters → Google 계정으로 로그인
+2. **Google Search Console 에서 가져오기(Import)** → 읽기 권한 허용 → `vmoa.live` 선택 (소유 확인·사이트맵이 함께 넘어옴)
+3. **Sitemaps** 에 `https://vmoa.live/sitemap.xml`·`https://vmoa.live/rss.xml` 제출
+4. IndexNow 는 코드로 이미 동작 — 별도 설정 없음
+
+## 4. 주간 점검 기록
+
+`C:/01_Work/01_Project/21_VtuberCommunity/seo/daily-log.md` (기준점 `seo/baseline.md`, 내보낸 CSV `seo/gsc-<날짜>/`). 저장소 밖 폴더.
+
+## 5. 등록 후 확인할 것
 
 - Search Console **페이지(색인 생성)** 보고서: 처음 며칠은 “발견됨 – 현재 색인이 생성되지 않음”이 정상. 1~2주 지켜보기
 - 이슈 글이 쌓이면서 색인 수가 늘어나는지 (이슈 상세가 검색 유입의 주력 — 자체 텍스트 + 출처)
