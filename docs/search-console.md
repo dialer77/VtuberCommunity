@@ -13,7 +13,7 @@
 | 검색 제외 | `/coins`(베타) `noindex` · `api.vmoa.live`(JSON API) 응답 전체 `X-Robots-Tag: noindex` · 없는 페이지 `noindex` |
 | RSS | `https://vmoa.live/rss.xml` — 최근 이슈 30개 (네이버 RSS 제출용), 모든 페이지에 `<link rel="alternate">` |
 | IndexNow (Bing 등) | 새 이슈가 올라오면 서버가 `/issue/<slug>`·`/issue`·`/` 를 알림 (`server/src/indexnow.ts`, 기본: `ISSUES_ENABLED` 를 따라감, `INDEXNOW_ENABLED=0` 으로 끔). 키 파일 `web/public/b8d1f735….txt` (공개 값) |
-| 소유 확인 태그 | 필요 시 Vercel 환경변수 `GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION` 로 `<meta>` 출력 |
+| 소유 확인 태그 | 네이버 `naver-site-verification` 은 코드 기본값(`web/src/app/layout.tsx`, 2026-11-26 발급). 환경변수 `GOOGLE_SITE_VERIFICATION` / `NAVER_SITE_VERIFICATION` 로 덮어쓸 수 있음 |
 
 ## 1. Google Search Console 등록
 

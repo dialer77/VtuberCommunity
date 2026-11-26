@@ -45,12 +45,14 @@ export const metadata: Metadata = {
     title: "버모아 · VMOA",
     description: DESCRIPTION,
   },
-  // 검색엔진 소유 확인 (HTML 태그 방식을 쓸 때만). 도메인 속성(DNS TXT)으로 확인했다면 비워둬도 된다.
+  // 검색엔진 소유 확인 (HTML 태그 방식, 공개 값). 구글은 도메인 속성(DNS TXT)으로 확인해서 비워 둔다.
+  // 네이버 서치어드바이저 vmoa.live 값이 기본 — 환경변수로 덮어쓸 수 있음
   verification: {
     google: process.env.GOOGLE_SITE_VERIFICATION || undefined,
-    other: process.env.NAVER_SITE_VERIFICATION
-      ? { "naver-site-verification": process.env.NAVER_SITE_VERIFICATION }
-      : undefined,
+    other: {
+      "naver-site-verification":
+        process.env.NAVER_SITE_VERIFICATION || "f6daa018ce0e83a8f73b59fe680c8ea8e8fdb53c",
+    },
   },
   // 애드센스 사이트 소유권 확인 (메타 태그 방식). 광고 스크립트는 페이지가 뜬 뒤에 붙어서 검사기가 못 볼 수 있다
   other: ADSENSE_CLIENT ? { "google-adsense-account": ADSENSE_CLIENT } : undefined,
