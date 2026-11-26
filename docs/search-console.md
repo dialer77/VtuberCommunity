@@ -47,7 +47,7 @@
 
 ## 4. 주간 점검 기록
 
-`C:/01_Work/01_Project/21_VtuberCommunity/seo/daily-log.md` (기준점 `seo/baseline.md`, 내보낸 CSV `seo/gsc-<날짜>/`). 저장소 밖 폴더.
+`C:/01_Work/01_Project/21_VtuberCommunity_seo/daily-log.md` (기준점 `baseline.md`, 내보낸 CSV `gsc-<날짜>/`). 저장소 밖 폴더 (lucky 의 `20_LuckyNumberPage/seo-adsense/` 와 같은 구조).
 
 ## 5. 등록 후 확인할 것
 

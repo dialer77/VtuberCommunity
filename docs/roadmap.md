@@ -2,7 +2,7 @@
 
 새 세션은 이 문서부터 읽고 시작합니다. 현재 상태, 남은 설정, 다음 작업 순서, 이미 정한 결정, 작업 규칙을 모았습니다.
 
-기준일: 2026-11-25
+기준일: 2026-11-26
 
 ## 1. 한눈에 보기
 
@@ -24,7 +24,7 @@
 | `docs/issue-collector.md` | 이슈 자동 수집 (Claude 구독 + Claude Code 헤드리스) |
 | `docs/user-accounts.md` | 로그인·최애·웹 푸시 설정, 외부 DB 이전 |
 | `docs/youtube-api.md` | YouTube API 키, 공식 채널 연동(`youtube.ps1`)·키리누키(`clips.ps1`) 운영, 할당량, 지켜야 할 정책 |
-| `docs/search-console.md` | Google Search Console |
+| `docs/search-console.md` | 검색엔진 등록 — 구글·네이버·Bing, RSS·IndexNow, 주간 점검 기록 위치 |
 | `docs/graph.md` | 관계 그래프 — 관계도·게임·사건 페이지·검색 바로가기, 운영(`graph.ps1`) |
 | `docs/calendar.md` | 기념일 캘린더·공식 SNS·팬아트 태그 — 웹 수집, 운영(`calendar.ps1`) |
 
@@ -46,6 +46,7 @@
 - 유튜브 전용 버튜버 (2026-11-13): 치지직·SOOP 채널 없이 유튜브에서 활동하는 버튜버를 `yt_vtubers` 로 따로 관리. 7일마다 Claude 웹 수집(한국 유튜브 버튜버 + 키리누키에 나오는데 모르는 버튜버, 해외 포함) + 데뷔 소식의 유튜브 채널 + 운영자 `youtube.ps1 vtuber-add` → API 로 채널 확인 후 등록. 검색(이름·별칭·유튜브 채널명·소속), 프로필 `/vtuber/youtube/UC…`(공식 영상·노래·키리누키, 방송 통계 대신 노래·클립 수), 키리누키 출연 연결(새 클립은 분류 후보, 예전 클립은 RSS 제목·요약에 이름 전체), 키리누키 채널 찾기 대상(한국어만), 유튜브 라이브(한국어만 LIVE 목록, 해외는 프로필·검색에만). 나중에 치지직·SOOP 버튜버의 공식 채널로 연결되면 자동으로 빠짐. 코드 `server/src/youtube/vtubers.ts`, 운영 `docs/youtube-api.md` 5장
 - 노래 모음 (2026-11-13): 공식 채널 영상 중 제목에 커버·오리지널 표기가 있는 노래. RSS(새 노래) + 업로드 목록 한 번 훑기(예전 노래) → videos.list 로 길이(1~15분)·공개 확인, 20일마다 갱신. `/songs`(전체·커버·오리지널·검색·전체 재생), 프로필 "노래" 탭, 홈 "새로 올라온 노래", 통합 검색 노래 결과, 메뉴 "노래". 코드 `server/src/youtube/songs.ts`, `web/src/components/song-card.tsx`, 운영 `docs/youtube-api.md` 6장
 - 기념일 캘린더 (2026-11-17): `/calendar`(한 달 달력·날짜별 목록, 생일·데뷔 n주년·데뷔 100/500/1000일·데뷔 예정·오리지널곡 공개), 홈 "다가오는 기념일"(7일), 프로필 머리의 생일·데뷔일·D-day, 검색 설명문에 생일·데뷔일, 메뉴 "캘린더". 생일(월-일)·데뷔일은 12시간마다 Claude 웹 수집 20명씩(월간 상위 300 → 유튜브 전용 → 확정 목록, 출처 필수), 운영자 수정 `calendar.ps1`. 코드 `server/src/calendar/`, `web/src/components/calendar-events.tsx`, 문서 `docs/calendar.md`
+- 검색엔진 등록·점검 (2026-11-26): `/rss.xml`(최근 이슈 30개), IndexNow(새 이슈 저장 시 서버가 알림, `server/src/indexnow.ts`, 기본 `ISSUES_ENABLED` 를 따라감), 네이버 소유확인 메타 기본값. Bing 웹마스터 등록(GSC 가져오기, sitemap·rss 제출), 네이버 서치어드바이저 사이트 등록. 첫 구글 점검: 3개월 클릭 4·노출 64, 색인됨 2 / 발견됨-색인 안 됨 6,728, sitemap 9,406 URL 읽힘. 기록은 저장소 밖 `C:/01_Work/01_Project/21_VtuberCommunity_seo/` (`daily-log.md`·`baseline.md`·`gsc-<날짜>/`), 주간 자동 점검(월 09:30)은 따로 만듦
 - 합방 조합·입문 모음 (2026-11-25): `/duo/<A>/<B>` (함께 나온 키리누키·같은 소속·같이 한 게임·사건, 관계도 '자주 합방' 칩에서), `/vtuber/…/intro` "OO 처음이라면" (좋아요·대표 장면·자주 하는 게임을 섞은 10개, 이어 보기), 사이트맵. 키리누키 주제 기본 별칭을 서버 시작 때 기존 클립에도 적용 (스텔마크 변형·GTA 6 등), 방송 종류 주제(노래 커버·클립 모음 등)는 일반 주제로. 코드 `server/src/graph/view.ts`(duoPage), `server/src/clips/intro.ts`
 - 관계 그래프 (2026-11-19): 버튜버·소속사·그룹·게임·사건·이슈를 점으로, 소속·합방(클립 공동 출연)·게임·사건·이슈 언급을 선으로 30분마다 메모리에 만듦 (`server/src/graph/`). 프로필 **관계도** 탭(마인드맵 그림 + 목록), `/game/<이름>`·`/event/<이름>` 페이지(관계도 + 클립, 사이트맵), `/map?n=` (소속사 등), 통합 검색 바로가기(운영자 검색어·게임·사건·소속사 칩), 클립 상세의 게임·사건 링크, 이슈의 이름 → 버튜버 연결. 운영 `graph.ps1` (alias-add·unlink 등). 문서 `docs/graph.md`
 - 공식 SNS·팬아트 태그 (2026-11-18): 프로필 머리 공식 SNS 줄 + "SNS·팬아트" 탭(공식 링크·유튜브/치지직 커뮤니티·팬카페 바로가기·팬아트 태그 → X 이미지 검색·X 공식 타임라인 임베드는 누를 때만). 링크는 치지직·SOOP 채널 소개(10분마다 25명, 7일 갱신, `server/src/social/`) + 생일·데뷔일 웹 수집이 같이 찾는 공식 SNS·해시태그. **팬아트·게시물은 저장하지 않고 원래 자리로 연결** (저작권·약관). 운영 `calendar.ps1 links·link-add·tag-add`. 개인정보처리방침에 X 위젯 안내
@@ -64,6 +65,7 @@
 - [ ] **유튜브 전용 버튜버 확인** (배포 후 일주일쯤): 첫 웹 수집은 배포 직후 Claude 작업 순서가 오면 돈다(이슈·데뷔·클립 분류 다음). `youtube.ps1 vtubers` 로 목록을 보고 버튜버가 아니거나 잘못 찾은 채널은 `vtuber-block`, 아는데 빠진 버튜버는 `vtuber-add`. `youtube.ps1 songs` 로 노래가 쌓이는지 (처음 훑기는 며칠)
 - [ ] **관계 그래프 확인** (배포 후): `graph.ps1 status`·`issues` 로 이슈 이름이 버튜버로 이어졌는지 보고, 애칭·줄임말은 `alias-add`. 같은 게임이 여러 이름이면 `clips.ps1 alias` 로 통일
 - [ ] **기념일 확인** (배포 후 1~2주): 생일·데뷔일은 12시간마다 20명씩 쌓여 상위 300명이 2주쯤 걸림. `calendar.ps1 status`·`list found` 로 보고 틀린 값은 `set`, 급하면 `run 20`
+- [ ] **네이버 서치어드바이저 소유확인**: Orca 내장 브라우저 탭에서 보안문자 입력 → 확인. 그다음 사이트맵 `https://vmoa.live/sitemap.xml`(전체 주소)·RSS `https://vmoa.live/rss.xml` 제출 (제출에도 보안문자) — `docs/search-console.md` 2장
 - [ ] **이슈 수집 토큰 교체**: 사용자가 Claude 계정을 바꿀 예정이라 새 계정으로 다시 발급 — `deploy\windows\setup-issues.ps1 -RenewToken`
 
 ### 아직 확인하지 못한 것
